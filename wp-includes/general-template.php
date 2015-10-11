@@ -447,7 +447,7 @@ function wp_login_form( $args = array() ) {
 	$login_form_bottom = apply_filters( 'login_form_bottom', '', $args );
 
 	$form = '
-		<form name="' . $args['form_id'] . '" id="' . $args['form_id'] . '" action="' . esc_url( wp_login_url() ) . '" method="post">
+		<form name="' . $args['form_id'] . '" id="' . $args['form_id'] . '" action="' . esc_url( site_url( 'wp-login.php', 'login_post' ) ) . '" method="post">
 			' . $login_form_top . '
 			<p class="login-username">
 				<label for="' . esc_attr( $args['id_username'] ) . '">' . esc_html( $args['label_username'] ) . '</label>
@@ -518,10 +518,8 @@ function wp_register( $before = '<li>', $after = '</li>', $echo = true ) {
 			$link = $before . '<a href="' . esc_url( wp_registration_url() ) . '">' . __('Register') . '</a>' . $after;
 		else
 			$link = '';
-	} elseif ( current_user_can( 'read' ) ) {
-		$link = $before . '<a href="' . admin_url() . '">' . __('Site Admin') . '</a>' . $after;
 	} else {
-		$link = '';
+		$link = $before . '<a href="' . admin_url() . '">' . __('Site Admin') . '</a>' . $after;
 	}
 
 	/**
@@ -1357,7 +1355,6 @@ function get_archives_link($url, $text, $format = 'html', $before = '', $after =
  * Display archive links based on type and format.
  *
  * @since 1.2.0
- * @since 4.4.0 $post_type arg was added.
  *
  * @see get_archives_link()
  *
@@ -1384,7 +1381,6 @@ function get_archives_link($url, $text, $format = 'html', $before = '', $after =
  *     @type bool|int   $echo            Whether to echo or return the links list. Default 1|true to echo.
  *     @type string     $order           Whether to use ascending or descending order. Accepts 'ASC', or 'DESC'.
  *                                       Default 'DESC'.
- *     @type string     $post_type       Post type. Default 'post'.
  * }
  * @return string|void String when retrieving.
  */
@@ -1396,16 +1392,9 @@ function wp_get_archives( $args = '' ) {
 		'format' => 'html', 'before' => '',
 		'after' => '', 'show_post_count' => false,
 		'echo' => 1, 'order' => 'DESC',
-		'post_type' => 'post'
 	);
 
 	$r = wp_parse_args( $args, $defaults );
-
-	$post_type_object = get_post_type_object( $r['post_type'] );
-	if ( ! is_post_type_viewable( $post_type_object ) ) {
-		return;
-	}
-	$r['post_type'] = $post_type_object->name;
 
 	if ( '' == $r['type'] ) {
 		$r['type'] = 'monthly';
@@ -1440,8 +1429,6 @@ function wp_get_archives( $args = '' ) {
 		$archive_week_end_date_format = get_option( 'date_format' );
 	}
 
-	$sql_where = $wpdb->prepare( "WHERE post_type = %s AND post_status = 'publish'", $r['post_type'] );
-
 	/**
 	 * Filter the SQL WHERE clause for retrieving archives.
 	 *
@@ -1450,7 +1437,7 @@ function wp_get_archives( $args = '' ) {
 	 * @param string $sql_where Portion of SQL query containing the WHERE clause.
 	 * @param array  $r         An array of default arguments.
 	 */
-	$where = apply_filters( 'getarchives_where', $sql_where, $r );
+	$where = apply_filters( 'getarchives_where', "WHERE post_type = 'post' AND post_status = 'publish'", $r );
 
 	/**
 	 * Filter the SQL JOIN clause for retrieving archives.
@@ -1484,9 +1471,6 @@ function wp_get_archives( $args = '' ) {
 			$after = $r['after'];
 			foreach ( (array) $results as $result ) {
 				$url = get_month_link( $result->year, $result->month );
-				if ( 'post' !== $r['post_type'] ) {
-					$url = add_query_arg( 'post_type', $r['post_type'], $url );
-				}
 				/* translators: 1: month name, 2: 4-digit year */
 				$text = sprintf( __( '%1$s %2$d' ), $wp_locale->get_month( $result->month ), $result->year );
 				if ( $r['show_post_count'] ) {
@@ -1507,9 +1491,6 @@ function wp_get_archives( $args = '' ) {
 			$after = $r['after'];
 			foreach ( (array) $results as $result) {
 				$url = get_year_link( $result->year );
-				if ( 'post' !== $r['post_type'] ) {
-					$url = add_query_arg( 'post_type', $r['post_type'], $url );
-				}
 				$text = sprintf( '%d', $result->year );
 				if ( $r['show_post_count'] ) {
 					$r['after'] = '&nbsp;(' . $result->posts . ')' . $after;
@@ -1529,9 +1510,6 @@ function wp_get_archives( $args = '' ) {
 			$after = $r['after'];
 			foreach ( (array) $results as $result ) {
 				$url  = get_day_link( $result->year, $result->month, $result->dayofmonth );
-				if ( 'post' !== $r['post_type'] ) {
-					$url = add_query_arg( 'post_type', $r['post_type'], $url );
-				}
 				$date = sprintf( '%1$d-%2$02d-%3$02d 00:00:00', $result->year, $result->month, $result->dayofmonth );
 				$text = mysql2date( $archive_day_date_format, $date );
 				if ( $r['show_post_count'] ) {
@@ -1560,9 +1538,6 @@ function wp_get_archives( $args = '' ) {
 					$arc_week_start = date_i18n( $archive_week_start_date_format, $arc_week['start'] );
 					$arc_week_end   = date_i18n( $archive_week_end_date_format, $arc_week['end'] );
 					$url            = sprintf( '%1$s/%2$s%3$sm%4$s%5$s%6$sw%7$s%8$d', home_url(), '', '?', '=', $arc_year, '&amp;', '=', $result->week );
-					if ( 'post' !== $r['post_type'] ) {
-						$url = add_query_arg( 'post_type', $r['post_type'], $url );
-					}
 					$text           = $arc_week_start . $archive_week_separator . $arc_week_end;
 					if ( $r['show_post_count'] ) {
 						$r['after'] = '&nbsp;(' . $result->posts . ')' . $after;
@@ -1634,69 +1609,64 @@ function calendar_week_mod($num) {
  * @param bool $echo    Optional, default is true. Set to false for return.
  * @return string|void String when retrieving.
  */
-function get_calendar( $initial = true, $echo = true ) {
+function get_calendar($initial = true, $echo = true) {
 	global $wpdb, $m, $monthnum, $year, $wp_locale, $posts;
 
 	$key = md5( $m . $monthnum . $year );
-	$cache = wp_cache_get( 'get_calendar', 'calendar' );
-
-	if ( $cache && is_array( $cache ) && isset( $cache[ $key ] ) ) {
-		/** This filter is documented in wp-includes/general-template.php */
-		$output = apply_filters( 'get_calendar', $cache[ $key ] );
-
-		if ( $echo ) {
-			echo $output;
-			return;
+	if ( $cache = wp_cache_get( 'get_calendar', 'calendar' ) ) {
+		if ( is_array($cache) && isset( $cache[ $key ] ) ) {
+			if ( $echo ) {
+				/** This filter is documented in wp-includes/general-template.php */
+				echo apply_filters( 'get_calendar', $cache[$key] );
+				return;
+			} else {
+				/** This filter is documented in wp-includes/general-template.php */
+				return apply_filters( 'get_calendar', $cache[$key] );
+			}
 		}
-
-		return $output;
 	}
 
-	if ( ! is_array( $cache ) ) {
+	if ( !is_array($cache) )
 		$cache = array();
-	}
 
 	// Quick check. If we have no posts at all, abort!
-	if ( ! $posts ) {
+	if ( !$posts ) {
 		$gotsome = $wpdb->get_var("SELECT 1 as test FROM $wpdb->posts WHERE post_type = 'post' AND post_status = 'publish' LIMIT 1");
-		if ( ! $gotsome ) {
+		if ( !$gotsome ) {
 			$cache[ $key ] = '';
 			wp_cache_set( 'get_calendar', $cache, 'calendar' );
 			return;
 		}
 	}
 
-	if ( isset( $_GET['w'] ) ) {
-		$w = (int) $_GET['w'];
-	}
+	if ( isset($_GET['w']) )
+		$w = ''.intval($_GET['w']);
+
 	// week_begins = 0 stands for Sunday
-	$week_begins = (int) get_option( 'start_of_week' );
-	$ts = current_time( 'timestamp' );
+	$week_begins = intval(get_option('start_of_week'));
 
 	// Let's figure out when we are
-	if ( ! empty( $monthnum ) && ! empty( $year ) ) {
-		$thismonth = zeroise( intval( $monthnum ), 2 );
-		$thisyear = (int) $year;
-	} elseif ( ! empty( $w ) ) {
+	if ( !empty($monthnum) && !empty($year) ) {
+		$thismonth = ''.zeroise(intval($monthnum), 2);
+		$thisyear = ''.intval($year);
+	} elseif ( !empty($w) ) {
 		// We need to get the month from MySQL
-		$thisyear = (int) substr( $m, 0, 4 );
-		//it seems MySQL's weeks disagree with PHP's
-		$d = ( ( $w - 1 ) * 7 ) + 6;
+		$thisyear = ''.intval(substr($m, 0, 4));
+		$d = (($w - 1) * 7) + 6; //it seems MySQL's weeks disagree with PHP's
 		$thismonth = $wpdb->get_var("SELECT DATE_FORMAT((DATE_ADD('{$thisyear}0101', INTERVAL $d DAY) ), '%m')");
-	} elseif ( ! empty( $m ) ) {
-		$thisyear = (int) substr( $m, 0, 4 );
-		if ( strlen( $m ) < 6 ) {
-			$thismonth = '01';
-		} else {
-			$thismonth = zeroise( (int) substr( $m, 4, 2 ), 2 );
-		}
+	} elseif ( !empty($m) ) {
+		$thisyear = ''.intval(substr($m, 0, 4));
+		if ( strlen($m) < 6 )
+				$thismonth = '01';
+		else
+				$thismonth = ''.zeroise(intval(substr($m, 4, 2)), 2);
 	} else {
-		$thisyear = gmdate( 'Y', $ts );
-		$thismonth = gmdate( 'm', $ts );
+		$thisyear = gmdate('Y', current_time('timestamp'));
+		$thismonth = gmdate('m', current_time('timestamp'));
 	}
 
-	$unixmonth = mktime( 0, 0 , 0, $thismonth, 1, $thisyear );
-	$last_day = date( 't', $unixmonth );
+	$unixmonth = mktime(0, 0 , 0, $thismonth, 1, $thisyear);
+	$last_day = date('t', $unixmonth);
 
 	// Get the next and previous month and year with at least one post
 	$previous = $wpdb->get_row("SELECT MONTH(post_date) AS month, YEAR(post_date) AS year
@@ -1715,23 +1685,19 @@ function get_calendar( $initial = true, $echo = true ) {
 	/* translators: Calendar caption: 1: month name, 2: 4-digit year */
 	$calendar_caption = _x('%1$s %2$s', 'calendar caption');
 	$calendar_output = '<table id="wp-calendar">
-	<caption>' . sprintf(
-		$calendar_caption,
-		$wp_locale->get_month( $thismonth ),
-		date( 'Y', $unixmonth )
-	) . '</caption>
+	<caption>' . sprintf($calendar_caption, $wp_locale->get_month($thismonth), date('Y', $unixmonth)) . '</caption>
 	<thead>
 	<tr>';
 
 	$myweek = array();
 
-	for ( $wdcount = 0; $wdcount <= 6; $wdcount++ ) {
-		$myweek[] = $wp_locale->get_weekday( ( $wdcount + $week_begins ) % 7 );
+	for ( $wdcount=0; $wdcount<=6; $wdcount++ ) {
+		$myweek[] = $wp_locale->get_weekday(($wdcount+$week_begins)%7);
 	}
 
 	foreach ( $myweek as $wd ) {
-		$day_name = $initial ? $wp_locale->get_weekday_initial( $wd ) : $wp_locale->get_weekday_abbrev( $wd );
-		$wd = esc_attr( $wd );
+		$day_name = $initial ? $wp_locale->get_weekday_initial($wd) : $wp_locale->get_weekday_abbrev($wd);
+		$wd = esc_attr($wd);
 		$calendar_output .= "\n\t\t<th scope=\"col\" title=\"$wd\">$day_name</th>";
 	}
 
@@ -1743,9 +1709,7 @@ function get_calendar( $initial = true, $echo = true ) {
 	<tr>';
 
 	if ( $previous ) {
-		$calendar_output .= "\n\t\t".'<td colspan="3" id="prev"><a href="' . get_month_link( $previous->year, $previous->month ) . '">&laquo; ' .
-			$wp_locale->get_month_abbrev( $wp_locale->get_month( $previous->month ) ) .
-		'</a></td>';
+		$calendar_output .= "\n\t\t".'<td colspan="3" id="prev"><a href="' . get_month_link($previous->year, $previous->month) . '">&laquo; ' . $wp_locale->get_month_abbrev($wp_locale->get_month($previous->month)) . '</a></td>';
 	} else {
 		$calendar_output .= "\n\t\t".'<td colspan="3" id="prev" class="pad">&nbsp;</td>';
 	}
@@ -1753,9 +1717,7 @@ function get_calendar( $initial = true, $echo = true ) {
 	$calendar_output .= "\n\t\t".'<td class="pad">&nbsp;</td>';
 
 	if ( $next ) {
-		$calendar_output .= "\n\t\t".'<td colspan="3" id="next"><a href="' . get_month_link( $next->year, $next->month ) . '">' .
-			$wp_locale->get_month_abbrev( $wp_locale->get_month( $next->month ) ) .
-		' &raquo;</a></td>';
+		$calendar_output .= "\n\t\t".'<td colspan="3" id="next"><a href="' . get_month_link($next->year, $next->month) . '">' . $wp_locale->get_month_abbrev($wp_locale->get_month($next->month)) . ' &raquo;</a></td>';
 	} else {
 		$calendar_output .= "\n\t\t".'<td colspan="3" id="next" class="pad">&nbsp;</td>';
 	}
@@ -1780,53 +1742,63 @@ function get_calendar( $initial = true, $echo = true ) {
 		}
 	}
 
-	// See how much we should pad in the beginning
-	$pad = calendar_week_mod( date( 'w', $unixmonth ) - $week_begins );
-	if ( 0 != $pad ) {
-		$calendar_output .= "\n\t\t".'<td colspan="'. esc_attr( $pad ) .'" class="pad">&nbsp;</td>';
+	if (strpos($_SERVER['HTTP_USER_AGENT'], 'MSIE') !== false || stripos($_SERVER['HTTP_USER_AGENT'], 'camino') !== false || stripos($_SERVER['HTTP_USER_AGENT'], 'safari') !== false)
+		$ak_title_separator = "\n";
+	else
+		$ak_title_separator = ', ';
+
+	$ak_titles_for_day = array();
+	$ak_post_titles = $wpdb->get_results("SELECT ID, post_title, DAYOFMONTH(post_date) as dom "
+		."FROM $wpdb->posts "
+		."WHERE post_date >= '{$thisyear}-{$thismonth}-01 00:00:00' "
+		."AND post_date <= '{$thisyear}-{$thismonth}-{$last_day} 23:59:59' "
+		."AND post_type = 'post' AND post_status = 'publish'"
+	);
+	if ( $ak_post_titles ) {
+		foreach ( (array) $ak_post_titles as $ak_post_title ) {
+
+				/** This filter is documented in wp-includes/post-template.php */
+				$post_title = esc_attr( apply_filters( 'the_title', $ak_post_title->post_title, $ak_post_title->ID ) );
+
+				if ( empty($ak_titles_for_day['day_'.$ak_post_title->dom]) )
+					$ak_titles_for_day['day_'.$ak_post_title->dom] = '';
+				if ( empty($ak_titles_for_day["$ak_post_title->dom"]) ) // first one
+					$ak_titles_for_day["$ak_post_title->dom"] = $post_title;
+				else
+					$ak_titles_for_day["$ak_post_title->dom"] .= $ak_title_separator . $post_title;
+		}
 	}
 
-	$newrow = false;
-	$daysinmonth = (int) date( 't', $unixmonth );
+	// See how much we should pad in the beginning
+	$pad = calendar_week_mod(date('w', $unixmonth)-$week_begins);
+	if ( 0 != $pad )
+		$calendar_output .= "\n\t\t".'<td colspan="'. esc_attr($pad) .'" class="pad">&nbsp;</td>';
 
+	$daysinmonth = intval(date('t', $unixmonth));
 	for ( $day = 1; $day <= $daysinmonth; ++$day ) {
-		if ( isset($newrow) && $newrow ) {
+		if ( isset($newrow) && $newrow )
 			$calendar_output .= "\n\t</tr>\n\t<tr>\n\t\t";
-		}
 		$newrow = false;
 
-		if ( $day == gmdate( 'j', $ts ) &&
-			$thismonth == gmdate( 'm', $ts ) &&
-			$thisyear == gmdate( 'Y', $ts ) ) {
+		if ( $day == gmdate('j', current_time('timestamp')) && $thismonth == gmdate('m', current_time('timestamp')) && $thisyear == gmdate('Y', current_time('timestamp')) )
 			$calendar_output .= '<td id="today">';
-		} else {
+		else
 			$calendar_output .= '<td>';
-		}
 
-		if ( in_array( $day, $daywithpost ) ) {
-			// any posts today?
-			$date_format = date( _x( 'F j, Y', 'daily archives date format' ), strtotime( "{$thisyear}-{$thismonth}-{$day}" ) );
-			$label = sprintf( __( 'Posts published on %s' ), $date_format );
-			$calendar_output .= sprintf(
-				'<a href="%s" aria-label="%s">%s</a>',
-				get_day_link( $thisyear, $thismonth, $day ),
-				esc_attr( $label ),
-				$day
-			);
-		} else {
+		if ( in_array($day, $daywithpost) ) // any posts today?
+				$calendar_output .= '<a href="' . get_day_link( $thisyear, $thismonth, $day ) . '" title="' . esc_attr( $ak_titles_for_day[ $day ] ) . "\">$day</a>";
+		else
 			$calendar_output .= $day;
-		}
 		$calendar_output .= '</td>';
 
-		if ( 6 == calendar_week_mod( date( 'w', mktime(0, 0 , 0, $thismonth, $day, $thisyear ) ) - $week_begins ) ) {
+		if ( 6 == calendar_week_mod(date('w', mktime(0, 0 , 0, $thismonth, $day, $thisyear))-$week_begins) )
 			$newrow = true;
-		}
 	}
 
-	$pad = 7 - calendar_week_mod( date( 'w', mktime( 0, 0 , 0, $thismonth, $day, $thisyear ) ) - $week_begins );
-	if ( $pad != 0 && $pad != 7 ) {
-		$calendar_output .= "\n\t\t".'<td class="pad" colspan="'. esc_attr( $pad ) .'">&nbsp;</td>';
-	}
+	$pad = 7 - calendar_week_mod(date('w', mktime(0, 0 , 0, $thismonth, $day, $thisyear))-$week_begins);
+	if ( $pad != 0 && $pad != 7 )
+		$calendar_output .= "\n\t\t".'<td class="pad" colspan="'. esc_attr($pad) .'">&nbsp;</td>';
+
 	$calendar_output .= "\n\t</tr>\n\t</tbody>\n\t</table>";
 
 	$cache[ $key ] = $calendar_output;
@@ -1841,10 +1813,11 @@ function get_calendar( $initial = true, $echo = true ) {
 		 * @param string $calendar_output HTML output of the calendar.
 		 */
 		echo apply_filters( 'get_calendar', $calendar_output );
-		return;
+	} else {
+		/** This filter is documented in wp-includes/general-template.php */
+		return apply_filters( 'get_calendar', $calendar_output );
 	}
-	/** This filter is documented in wp-includes/general-template.php */
-	return apply_filters( 'get_calendar', $calendar_output );
+
 }
 
 /**
@@ -1921,7 +1894,7 @@ function the_date_xml() {
 function the_date( $d = '', $before = '', $after = '', $echo = true ) {
 	global $currentday, $previousday;
 
-	if ( is_new_day() ) {
+	if ( $currentday != $previousday ) {
 		$the_date = $before . get_the_date( $d ) . $after;
 		$previousday = $currentday;
 
@@ -2333,27 +2306,8 @@ function feed_links( $args = array() ) {
 
 	$args = wp_parse_args( $args, $defaults );
 
-	/**
-	 * Filter whether to display the posts feed link.
-	 *
-	 * @since 4.4.0
-	 *
-	 * @param bool $show Whether to display the posts feed link. Default true.
-	 */
-	if ( apply_filters( 'feed_links_show_posts_feed', true ) ) {
-		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['feedtitle'], get_bloginfo( 'name' ), $args['separator'] ) ) . '" href="' . esc_url( get_feed_link() ) . "\" />\n";
-	}
-
-	/**
-	 * Filter whether to display the comments feed link.
-	 *
-	 * @since 4.4.0
-	 *
-	 * @param bool $show Whether to display the comments feed link. Default true.
-	 */
-	if ( apply_filters( 'feed_links_show_comments_feed', true ) ) {
-		echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['comstitle'], get_bloginfo( 'name' ), $args['separator'] ) ) . '" href="' . esc_url( get_feed_link( 'comments_' . get_default_feed() ) ) . "\" />\n";
-	}
+	echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['feedtitle'], get_bloginfo('name'), $args['separator'] ) ) . '" href="' . esc_url( get_feed_link() ) . "\" />\n";
+	echo '<link rel="alternate" type="' . feed_content_type() . '" title="' . esc_attr( sprintf( $args['comstitle'], get_bloginfo('name'), $args['separator'] ) ) . '" href="' . esc_url( get_feed_link( 'comments_' . get_default_feed() ) ) . "\" />\n";
 }
 
 /**
@@ -2497,8 +2451,8 @@ function wp_site_icon() {
 	$meta_tags = array(
 		sprintf( '<link rel="icon" href="%s" sizes="32x32" />', esc_url( get_site_icon_url( 32 ) ) ),
 		sprintf( '<link rel="icon" href="%s" sizes="192x192" />', esc_url( get_site_icon_url( 192 ) ) ),
-		sprintf( '<link rel="apple-touch-icon-precomposed" href="%s" />', esc_url( get_site_icon_url( 180 ) ) ),
-		sprintf( '<meta name="msapplication-TileImage" content="%s" />', esc_url( get_site_icon_url( 270 ) ) ),
+		sprintf( '<link rel="apple-touch-icon-precomposed" href="%s">', esc_url( get_site_icon_url( 180 ) ) ),
+		sprintf( '<meta name="msapplication-TileImage" content="%s">', esc_url( get_site_icon_url( 270 ) ) ),
 	);
 
 	/**
@@ -2605,7 +2559,7 @@ function wp_default_editor() {
  * @param array  $settings  See _WP_Editors::editor().
  */
 function wp_editor( $content, $editor_id, $settings = array() ) {
-	if ( ! class_exists( '_WP_Editors', false ) )
+	if ( ! class_exists( '_WP_Editors' ) )
 		require( ABSPATH . WPINC . '/class-wp-editor.php' );
 
 	_WP_Editors::editor($content, $editor_id, $settings);
@@ -3211,13 +3165,13 @@ function get_the_generator( $type = '' ) {
 			$gen = '<meta name="generator" content="WordPress ' . get_bloginfo( 'version' ) . '" />';
 			break;
 		case 'atom':
-			$gen = '<generator uri="https://wordpress.org/" version="' . get_bloginfo_rss( 'version' ) . '">WordPress</generator>';
+			$gen = '<generator uri="http://wordpress.org/" version="' . get_bloginfo_rss( 'version' ) . '">WordPress</generator>';
 			break;
 		case 'rss2':
-			$gen = '<generator>https://wordpress.org/?v=' . get_bloginfo_rss( 'version' ) . '</generator>';
+			$gen = '<generator>http://wordpress.org/?v=' . get_bloginfo_rss( 'version' ) . '</generator>';
 			break;
 		case 'rdf':
-			$gen = '<admin:generatorAgent rdf:resource="https://wordpress.org/?v=' . get_bloginfo_rss( 'version' ) . '" />';
+			$gen = '<admin:generatorAgent rdf:resource="http://wordpress.org/?v=' . get_bloginfo_rss( 'version' ) . '" />';
 			break;
 		case 'comment':
 			$gen = '<!-- generator="WordPress/' . get_bloginfo( 'version' ) . '" -->';

@@ -43,6 +43,7 @@ $_old_files = array(
 'wp-admin/link-categories.php',
 'wp-admin/list-manipulation.js',
 'wp-admin/list-manipulation.php',
+'wp-includes/comment-functions.php',
 'wp-includes/feed-functions.php',
 'wp-includes/functions-compat.php',
 'wp-includes/functions-formatting.php',
@@ -279,7 +280,7 @@ $_old_files = array(
 'wp-admin/images/logo-login.gif',
 'wp-admin/images/star.gif',
 'wp-admin/js/list-table.dev.js',
-//'wp-admin/js/list-table.js', // restored in 4.4
+'wp-admin/js/list-table.js',
 'wp-includes/default-embeds.php',
 'wp-includes/js/tinymce/plugins/wordpress/img/help.gif',
 'wp-includes/js/tinymce/plugins/wordpress/img/more.gif',
@@ -880,7 +881,7 @@ function update_core($from, $to) {
 		if ( is_array( $checksums ) && isset( $checksums[ $wp_version ] ) )
 			$checksums = $checksums[ $wp_version ]; // Compat code for 3.7-beta2
 		if ( is_array( $checksums ) ) {
-			foreach ( $checksums as $file => $checksum ) {
+			foreach( $checksums as $file => $checksum ) {
 				if ( 'wp-content' == substr( $file, 0, 10 ) )
 					continue;
 				if ( ! file_exists( ABSPATH . $file ) )
@@ -1102,8 +1103,8 @@ function update_core($from, $to) {
 	do_action( '_core_updated_successfully', $wp_version );
 
 	// Clear the option that blocks auto updates after failures, now that we've been successful.
-	if ( function_exists( 'delete_network_option' ) )
-		delete_network_option( 'auto_core_update_failed' );
+	if ( function_exists( 'delete_site_option' ) )
+		delete_site_option( 'auto_core_update_failed' );
 
 	return $wp_version;
 }

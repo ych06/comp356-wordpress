@@ -77,7 +77,7 @@ function wp_default_scripts( &$scripts ) {
 		'secure' => (string) ( 'https' === parse_url( site_url(), PHP_URL_SCHEME ) ),
 	) );
 
-	$scripts->add( 'common', "/wp-admin/js/common$suffix.js", array('jquery', 'hoverIntent', 'utils', 'list-table'), false, 1 );
+	$scripts->add( 'common', "/wp-admin/js/common$suffix.js", array('jquery', 'hoverIntent', 'utils'), false, 1 );
 	did_action( 'init' ) && $scripts->localize( 'common', 'commonL10n', array(
 		'warnDelete' => __( "You are about to permanently delete the selected items.\n  'Cancel' to stop, 'OK' to delete." ),
 		'dismiss'    => __( 'Dismiss this notice.' ),
@@ -351,19 +351,9 @@ function wp_default_scripts( &$scripts ) {
 
 
 	$scripts->add( 'wp-mediaelement', "/wp-includes/js/mediaelement/wp-mediaelement.js", array('mediaelement'), false, 1 );
-	$mejs_settings = array(
+	did_action( 'init' ) && $scripts->localize( 'mediaelement', '_wpmejsSettings', array(
 		'pluginPath' => includes_url( 'js/mediaelement/', 'relative' ),
-	);
-	did_action( 'init' ) && $scripts->localize( 'mediaelement', '_wpmejsSettings',
-		/**
-		 * Filter the MediaElement configuration settings.
-		 *
-		 * @since 4.4.0
-		 *
-		 * @param array $mejs_settings MediaElement settings array.
-		 */
-		apply_filters( 'mejs_settings', $mejs_settings )
-	);
+	) );
 
 	$scripts->add( 'froogaloop',  "/wp-includes/js/mediaelement/froogaloop.min.js", array(), '2.0' );
 	$scripts->add( 'wp-playlist', "/wp-includes/js/mediaelement/wp-playlist.js", array( 'wp-util', 'backbone', 'mediaelement' ), false, 1 );
@@ -395,8 +385,6 @@ function wp_default_scripts( &$scripts ) {
 	$scripts->add( 'language-chooser', "/wp-admin/js/language-chooser$suffix.js", array( 'jquery' ), false, 1 );
 
 	$scripts->add( 'user-suggest', "/wp-admin/js/user-suggest$suffix.js", array( 'jquery-ui-autocomplete' ), false, 1 );
-
-	$scripts->add( 'list-table', "/wp-admin/js/list-table$suffix.js", array( 'jquery' ), false, 1 );
 
 	$scripts->add( 'admin-bar', "/wp-includes/js/admin-bar$suffix.js", array(), false, 1 );
 
@@ -440,7 +428,6 @@ function wp_default_scripts( &$scripts ) {
 		'cancel'             => __( 'Cancel' ),
 		'close'              => __( 'Close' ),
 		'cheatin'            => __( 'Cheatin&#8217; uh?' ),
-		'notAllowed'         => __( 'You are not allowed to customize the appearance of this site.' ),
 		'previewIframeTitle' => __( 'Site Preview' ),
 		'loginIframeTitle'   => __( 'Session expired' ),
 		'collapseSidebar'    => __( 'Collapse Sidebar' ),
@@ -576,18 +563,18 @@ function wp_default_scripts( &$scripts ) {
 		did_action( 'init' ) && $scripts->localize( 'updates', '_wpUpdatesSettings', array(
 			'ajax_nonce' => wp_create_nonce( 'updates' ),
 			'l10n'       => array(
-				'updating'          => __( 'Updating...' ), // no ellipsis
+				'updating'          => __( 'Updating...' ),
 				'updated'           => __( 'Updated!' ),
 				/* translators: Error string for a failed update */
 				'updateFailed'      => __( 'Update Failed: %s' ),
 				/* translators: Plugin name and version */
-				'updatingLabel'     => __( 'Updating %s...' ), // no ellipsis
+				'updatingLabel'     => __( 'Updating %s...' ),
 				/* translators: Plugin name and version */
 				'updatedLabel'      => __( '%s updated!' ),
 				/* translators: Plugin name and version */
 				'updateFailedLabel' => __( '%s update failed' ),
 				/* translators: JavaScript accessible string */
-				'updatingMsg'       => __( 'Updating... please wait.' ), // no ellipsis
+				'updatingMsg'       => __( 'Updating... please wait.' ),
 				/* translators: JavaScript accessible string */
 				'updatedMsg'        => __( 'Update completed successfully.' ),
 				/* translators: JavaScript accessible string */
@@ -625,7 +612,7 @@ function wp_default_scripts( &$scripts ) {
 		$scripts->add( 'set-post-thumbnail', "/wp-admin/js/set-post-thumbnail$suffix.js", array( 'jquery' ), false, 1 );
 		did_action( 'init' ) && $scripts->localize( 'set-post-thumbnail', 'setPostThumbnailL10n', array(
 			'setThumbnail' => __( 'Use as featured image' ),
-			'saving' => __( 'Saving...' ), // no ellipsis
+			'saving' => __( 'Saving...' ),
 			'error' => __( 'Could not set that as the thumbnail image. Try a different attachment.' ),
 			'done' => __( 'Done' )
 		) );
@@ -1161,13 +1148,13 @@ function script_concat_settings() {
 
 	if ( ! isset($compress_scripts) ) {
 		$compress_scripts = defined('COMPRESS_SCRIPTS') ? COMPRESS_SCRIPTS : true;
-		if ( $compress_scripts && ( ! get_network_option( 'can_compress_scripts' ) || $compressed_output ) )
+		if ( $compress_scripts && ( ! get_site_option('can_compress_scripts') || $compressed_output ) )
 			$compress_scripts = false;
 	}
 
 	if ( ! isset($compress_css) ) {
 		$compress_css = defined('COMPRESS_CSS') ? COMPRESS_CSS : true;
-		if ( $compress_css && ( ! get_network_option( 'can_compress_scripts' ) || $compressed_output ) )
+		if ( $compress_css && ( ! get_site_option('can_compress_scripts') || $compressed_output ) )
 			$compress_css = false;
 	}
 }

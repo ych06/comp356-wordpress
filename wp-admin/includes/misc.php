@@ -102,68 +102,50 @@ function extract_from_markers( $filename, $marker ) {
  * @return bool True on write success, false on failure.
  */
 function insert_with_markers( $filename, $marker, $insertion ) {
-	if ( ! is_writeable( $filename ) ) {
+	if (!file_exists( $filename ) || is_writeable( $filename ) ) {
+		if (!file_exists( $filename ) ) {
+			$markerdata = '';
+		} else {
+			$markerdata = explode( "\n", implode( '', file( $filename ) ) );
+		}
+
+		if ( !$f = @fopen( $filename, 'w' ) )
+			return false;
+
+		$foundit = false;
+		if ( $markerdata ) {
+			$state = true;
+			foreach ( $markerdata as $n => $markerline ) {
+				if (strpos($markerline, '# BEGIN ' . $marker) !== false)
+					$state = false;
+				if ( $state ) {
+					if ( $n + 1 < count( $markerdata ) )
+						fwrite( $f, "{$markerline}\n" );
+					else
+						fwrite( $f, "{$markerline}" );
+				}
+				if (strpos($markerline, '# END ' . $marker) !== false) {
+					fwrite( $f, "# BEGIN {$marker}\n" );
+					if ( is_array( $insertion ))
+						foreach ( $insertion as $insertline )
+							fwrite( $f, "{$insertline}\n" );
+					fwrite( $f, "# END {$marker}\n" );
+					$state = true;
+					$foundit = true;
+				}
+			}
+		}
+		if (!$foundit) {
+			fwrite( $f, "\n# BEGIN {$marker}\n" );
+			foreach ( $insertion as $insertline )
+				fwrite( $f, "{$insertline}\n" );
+			fwrite( $f, "# END {$marker}\n" );
+		}
+		fclose( $f );
+		return true;
+	} else {
 		return false;
 	}
-
-	if ( ! is_array( $insertion ) ) {
-		$insertion = array( $insertion );
-	}
-
-	$start_marker = "# BEGIN {$marker}";
-	$end_marker   = "# END {$marker}";
-
-	$fp = fopen( $filename, 'r+' );
-	if ( ! $fp ) {
-		return false;
-	}
-
-	// Attempt to get a lock. If the filesystem supports locking, this will block until the lock is acquired.
-	flock( $fp, LOCK_EX );
-
-	$lines = array();
-	while ( ! feof( $fp ) ) {
-		$lines[] = rtrim( fgets( $fp ), "\r\n" );
-	}
-
-	// Split out the existing file into the preceeding lines, and those that appear after the marker
-	$pre_lines = $post_lines = array();
-	$found_marker = $found_end_marker = false;
-	foreach ( $lines as $line ) {
-		if ( ! $found_marker && false !== strpos( $line, $start_marker ) ) {
-			$found_marker = true;
-			continue;
-		} elseif ( ! $found_end_marker && false !== strpos( $line, $end_marker ) ) {
-			$found_end_marker = true;
-			continue;
-		}
-		if ( ! $found_marker ) {
-			$pre_lines[] = $line;
-		} elseif ( $found_marker && $found_end_marker ) {
-			$post_lines[] = $line;
-		}
-	}
-
-	// Generate the new file data
-	$new_file_data = implode( "\n", array_merge(
-		$pre_lines,
-		array( $start_marker ),
-		$insertion,
-		array( $end_marker ),
-		$post_lines
-	) );
-
-	// Write to the start of the file, and truncate it to that length
-	fseek( $fp, 0 );
-	$bytes = fwrite( $fp, $new_file_data );
-	if ( $bytes ) {
-		ftruncate( $fp, $bytes );
-	}
-
-	flock( $fp, LOCK_UN );
-	fclose( $fp );
-
-	return (bool) $bytes;
 }
 
 /**
@@ -264,11 +246,8 @@ function update_home_siteurl( $old_value, $value ) {
 	if ( defined( "WP_INSTALLING" ) )
 		return;
 
-	if ( is_multisite() && ms_is_switched() ) {
-		delete_option( 'rewrite_rules' );
-	} else {
-		flush_rewrite_rules();
-	}
+	// If home changed, write rewrite rules to new location.
+	flush_rewrite_rules();
 }
 
 /**
@@ -475,9 +454,8 @@ function set_screen_options() {
 function iis7_rewrite_rule_exists($filename) {
 	if ( ! file_exists($filename) )
 		return false;
-	if ( ! class_exists( 'DOMDocument', false ) ) {
+	if ( ! class_exists('DOMDocument') )
 		return false;
-	}
 
 	$doc = new DOMDocument();
 	if ( $doc->load($filename) === false )
@@ -503,9 +481,8 @@ function iis7_delete_rewrite_rule($filename) {
 	if ( ! file_exists($filename) )
 		return true;
 
-	if ( ! class_exists( 'DOMDocument', false ) ) {
+	if ( ! class_exists('DOMDocument') )
 		return false;
-	}
 
 	$doc = new DOMDocument();
 	$doc->preserveWhiteSpace = false;
@@ -534,9 +511,8 @@ function iis7_delete_rewrite_rule($filename) {
  * @return bool
  */
 function iis7_add_rewrite_rule($filename, $rewrite_rule) {
-	if ( ! class_exists( 'DOMDocument', false ) ) {
+	if ( ! class_exists('DOMDocument') )
 		return false;
-	}
 
 	// If configuration file does not exist then we create one.
 	if ( ! file_exists($filename) ) {
@@ -889,7 +865,23 @@ function post_form_autocomplete_off() {
  * @since 4.2.0
  */
 function wp_admin_canonical_url() {
-	$removable_query_args = wp_removable_query_args();
+	$removable_query_args = array(
+		'message', 'settings-updated', 'saved',
+		'update', 'updated', 'activated',
+		'activate', 'deactivate', 'locked',
+		'deleted', 'trashed', 'untrashed',
+		'enabled', 'disabled', 'skipped',
+		'spammed', 'unspammed',
+	);
+
+	/**
+	 * Filter the list of URL parameters to remove.
+	 *
+	 * @since 4.2.0
+	 *
+	 * @param array $removable_query_args An array of parameters to remove from the URL.
+	 */
+	$removable_query_args = apply_filters( 'removable_query_args', $removable_query_args );
 
 	if ( empty( $removable_query_args ) ) {
 		return;

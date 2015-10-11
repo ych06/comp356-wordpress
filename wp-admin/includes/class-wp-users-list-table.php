@@ -45,7 +45,7 @@ class WP_Users_List_Table extends WP_List_Table {
 			'screen'   => isset( $args['screen'] ) ? $args['screen'] : null,
 		) );
 
-		$this->is_site_users = 'site-users-network' === $this->screen->id;
+		$this->is_site_users = 'site-users-network' == $this->screen->id;
 
 		if ( $this->is_site_users )
 			$this->site_id = isset( $_REQUEST['id'] ) ? intval( $_REQUEST['id'] ) : 0;
@@ -106,17 +106,6 @@ class WP_Users_List_Table extends WP_List_Table {
 
 		if ( isset( $_REQUEST['order'] ) )
 			$args['order'] = $_REQUEST['order'];
-
-		/**
-		 * Filter the query arguments used to retrieve users for the current users list table.
-		 *
-		 * @since 4.4.0
-		 *
-		 * @param array $args Arguments passed to WP_User_Query to retrieve items for the current
-		 *                    users list table.
-		 * @param mixed $this The current WP_Users_List_Table or WP_MS_Users_List_Table instance.
-		 */
-		$args = apply_filters( 'users_list_table_query_args', $args, $this );
 
 		// Query the user IDs for this page
 		$wp_user_search = new WP_User_Query( $args );
@@ -180,7 +169,7 @@ class WP_Users_List_Table extends WP_List_Table {
 
 			$class = '';
 
-			if ( $this_role === $role ) {
+			if ( $this_role == $role ) {
 				$class = ' class="current"';
 			}
 
@@ -225,12 +214,13 @@ class WP_Users_List_Table extends WP_List_Table {
 	 *                      or below the table ("bottom").
 	 */
 	protected function extra_tablenav( $which ) {
-		$id = 'bottom' === $which ? 'new_role2' : 'new_role';
+		if ( 'top' != $which )
+			return;
 	?>
 	<div class="alignleft actions">
-		<?php if ( current_user_can( 'promote_users' ) && $this->has_items() ) : ?>
-		<label class="screen-reader-text" for="<?php echo $id ?>"><?php _e( 'Change role to&hellip;' ) ?></label>
-		<select name="<?php echo $id ?>" id="<?php echo $id ?>">
+		<?php if ( current_user_can( 'promote_users' ) ) : ?>
+		<label class="screen-reader-text" for="new_role"><?php _e( 'Change role to&hellip;' ) ?></label>
+		<select name="new_role" id="new_role">
 			<option value=""><?php _e( 'Change role to&hellip;' ) ?></option>
 			<?php wp_dropdown_roles(); ?>
 		</select>
@@ -260,10 +250,8 @@ class WP_Users_List_Table extends WP_List_Table {
 	 * @return string The bulk action required.
 	 */
 	public function current_action() {
-		if ( isset( $_REQUEST['changeit'] ) &&
-			( ! empty( $_REQUEST['new_role'] ) || ! empty( $_REQUEST['new_role2'] ) ) ) {
+		if ( isset($_REQUEST['changeit']) && !empty($_REQUEST['new_role']) )
 			return 'promote';
-		}
 
 		return parent::current_action();
 	}
@@ -282,7 +270,7 @@ class WP_Users_List_Table extends WP_List_Table {
 			'cb'       => '<input type="checkbox" />',
 			'username' => __( 'Username' ),
 			'name'     => __( 'Name' ),
-			'email'    => __( 'Email' ),
+			'email'    => __( 'E-mail' ),
 			'role'     => __( 'Role' ),
 			'posts'    => __( 'Posts' )
 		);
@@ -371,13 +359,14 @@ class WP_Users_List_Table extends WP_List_Table {
 		else
 			$url = 'users.php?';
 
-		// Set up the hover actions for this user
-		$actions = array();
 		$checkbox = '';
 		// Check if the user for this row is editable
 		if ( current_user_can( 'list_users' ) ) {
 			// Set up the user editing link
 			$edit_link = esc_url( add_query_arg( 'wp_http_referer', urlencode( wp_unslash( $_SERVER['REQUEST_URI'] ) ), get_edit_user_link( $user_object->ID ) ) );
+
+			// Set up the hover actions for this user
+			$actions = array();
 
 			if ( current_user_can( 'edit_user',  $user_object->ID ) ) {
 				$edit = "<strong><a href=\"$edit_link\">$user_object->user_login</a></strong><br />";

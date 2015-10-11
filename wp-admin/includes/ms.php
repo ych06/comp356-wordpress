@@ -16,7 +16,7 @@
  * @return array $_FILES array with 'error' key set if file exceeds quota. 'error' is empty otherwise.
  */
 function check_upload_size( $file ) {
-	if ( get_network_option( 'upload_space_check_disabled' ) )
+	if ( get_site_option( 'upload_space_check_disabled' ) )
 		return $file;
 
 	if ( $file['error'] != '0' ) // there's already an error
@@ -30,8 +30,8 @@ function check_upload_size( $file ) {
 	$file_size = filesize( $file['tmp_name'] );
 	if ( $space_left < $file_size )
 		$file['error'] = sprintf( __( 'Not enough space to upload. %1$s KB needed.' ), number_format( ($file_size - $space_left) /1024 ) );
-	if ( $file_size > ( 1024 * get_network_option( 'fileupload_maxk', 1500 ) ) )
-		$file['error'] = sprintf(__('This file is too big. Files must be less than %1$s KB in size.'), get_network_option( 'fileupload_maxk', 1500 ) );
+	if ( $file_size > ( 1024 * get_site_option( 'fileupload_maxk', 1500 ) ) )
+		$file['error'] = sprintf(__('This file is too big. Files must be less than %1$s KB in size.'), get_site_option( 'fileupload_maxk', 1500 ) );
 	if ( upload_is_user_over_quota( false ) ) {
 		$file['error'] = __( 'You have used your space quota. Please delete files before uploading.' );
 	}
@@ -98,7 +98,7 @@ function wpmu_delete_blog( $blog_id, $drop = false ) {
 	$upload_path = trim( get_option( 'upload_path' ) );
 
 	// If ms_files_rewriting is enabled and upload_path is empty, wp_upload_dir is not reliable.
-	if ( $drop && get_network_option( 'ms_files_rewriting' ) && empty( $upload_path ) ) {
+	if ( $drop && get_site_option( 'ms_files_rewriting' ) && empty( $upload_path ) ) {
 		$drop = false;
 	}
 
@@ -158,7 +158,7 @@ function wpmu_delete_blog( $blog_id, $drop = false ) {
 		}
 
 		$stack = array_reverse( $stack ); // Last added dirs are deepest
-		foreach ( (array) $stack as $dir ) {
+		foreach( (array) $stack as $dir ) {
 			if ( $dir != $top_dir)
 			@rmdir( $dir );
 		}
@@ -184,10 +184,6 @@ function wpmu_delete_blog( $blog_id, $drop = false ) {
  */
 function wpmu_delete_user( $id ) {
 	global $wpdb;
-
-	if ( ! is_numeric( $id ) ) {
-		return false;
-	}
 
 	$id = (int) $id;
 	$user = new WP_User( $id );
@@ -306,7 +302,7 @@ All at ###SITENAME###
 	$content = str_replace( '###USERNAME###', $current_user->user_login, $content );
 	$content = str_replace( '###ADMIN_URL###', esc_url( admin_url( 'options.php?adminhash='.$hash ) ), $content );
 	$content = str_replace( '###EMAIL###', $value, $content );
-	$content = str_replace( '###SITENAME###', get_network_option( 'site_name' ), $content );
+	$content = str_replace( '###SITENAME###', get_site_option( 'site_name' ), $content );
 	$content = str_replace( '###SITEURL###', network_home_url(), $content );
 
 	wp_mail( $value, sprintf( __( '[%s] New Admin Email Address' ), wp_specialchars_decode( get_option( 'blogname' ) ) ), $content );
@@ -385,7 +381,7 @@ All at ###SITENAME###
 		$content = str_replace( '###USERNAME###', $current_user->user_login, $content );
 		$content = str_replace( '###ADMIN_URL###', esc_url( admin_url( 'profile.php?newuseremail='.$hash ) ), $content );
 		$content = str_replace( '###EMAIL###', $_POST['email'], $content);
-		$content = str_replace( '###SITENAME###', get_network_option( 'site_name' ), $content );
+		$content = str_replace( '###SITENAME###', get_site_option( 'site_name' ), $content );
 		$content = str_replace( '###SITEURL###', network_home_url(), $content );
 
 		wp_mail( $_POST['email'], sprintf( __( '[%s] New Email Address' ), wp_specialchars_decode( get_option( 'blogname' ) ) ), $content );
@@ -413,7 +409,7 @@ function new_user_email_admin_notice() {
  * @return bool True if user is over upload space quota, otherwise false.
  */
 function upload_is_user_over_quota( $echo = true ) {
-	if ( get_network_option( 'upload_space_check_disabled' ) )
+	if ( get_site_option( 'upload_space_check_disabled' ) )
 		return false;
 
 	$space_allowed = get_space_allowed();
@@ -746,7 +742,7 @@ function site_admin_notice() {
 	global $wp_db_version;
 	if ( !is_super_admin() )
 		return false;
-	if ( get_network_option( 'wpmu_upgrade_site' ) != $wp_db_version )
+	if ( get_site_option( 'wpmu_upgrade_site' ) != $wp_db_version )
 		echo "<div class='update-nag'>" . sprintf( __( 'Thank you for Updating! Please visit the <a href="%s">Upgrade Network</a> page to update all your sites.' ), esc_url( network_admin_url( 'upgrade.php' ) ) ) . "</div>";
 }
 
@@ -806,7 +802,7 @@ function choose_primary_blog() {
 			$found = false;
 			?>
 			<select name="primary_blog" id="primary_blog">
-				<?php foreach ( (array) $all_blogs as $blog ) {
+				<?php foreach( (array) $all_blogs as $blog ) {
 					if ( $primary_blog == $blog->userblog_id )
 						$found = true;
 					?><option value="<?php echo $blog->userblog_id ?>"<?php selected( $primary_blog, $blog->userblog_id ); ?>><?php echo esc_url( get_home_url( $blog->userblog_id ) ) ?></option><?php
@@ -828,7 +824,7 @@ function choose_primary_blog() {
 		?>
 		</td>
 	</tr>
-	<?php if ( in_array( get_network_option( 'registration' ), array( 'all', 'blog' ) ) ) : ?>
+	<?php if ( in_array( get_site_option( 'registration' ), array( 'all', 'blog' ) ) ) : ?>
 		<tr>
 			<th scope="row" colspan="2" class="th-full">
 				<?php
@@ -870,12 +866,12 @@ function grant_super_admin( $user_id ) {
 	do_action( 'grant_super_admin', $user_id );
 
 	// Directly fetch site_admins instead of using get_super_admins()
-	$super_admins = get_network_option( 'site_admins', array( 'admin' ) );
+	$super_admins = get_site_option( 'site_admins', array( 'admin' ) );
 
 	$user = get_userdata( $user_id );
 	if ( $user && ! in_array( $user->user_login, $super_admins ) ) {
 		$super_admins[] = $user->user_login;
-		update_network_option( 'site_admins' , $super_admins );
+		update_site_option( 'site_admins' , $super_admins );
 
 		/**
 		 * Fires after the user is granted Super Admin privileges.
@@ -917,13 +913,13 @@ function revoke_super_admin( $user_id ) {
 	do_action( 'revoke_super_admin', $user_id );
 
 	// Directly fetch site_admins instead of using get_super_admins()
-	$super_admins = get_network_option( 'site_admins', array( 'admin' ) );
+	$super_admins = get_site_option( 'site_admins', array( 'admin' ) );
 
 	$user = get_userdata( $user_id );
-	if ( $user && 0 !== strcasecmp( $user->user_email, get_network_option( 'admin_email' ) ) ) {
+	if ( $user && 0 !== strcasecmp( $user->user_email, get_site_option( 'admin_email' ) ) ) {
 		if ( false !== ( $key = array_search( $user->user_login, $super_admins ) ) ) {
 			unset( $super_admins[$key] );
-			update_network_option( 'site_admins', $super_admins );
+			update_site_option( 'site_admins', $super_admins );
 
 			/**
 			 * Fires after the user's Super Admin privileges are revoked.
@@ -982,137 +978,6 @@ function _thickbox_path_admin_subfolder() {
 ?>
 <script type="text/javascript">
 var tb_pathToImage = "<?php echo includes_url( 'js/thickbox/loadingAnimation.gif', 'relative' ); ?>";
-</script>
-<?php
-}
-
-/**
- *
- * @param array $users
- */
-function confirm_delete_users( $users ) {
-	$current_user = wp_get_current_user();
-	if ( ! is_array( $users ) || empty( $users ) ) {
-		return false;
-	}
-	?>
-	<h1><?php esc_html_e( 'Users' ); ?></h1>
-
-	<?php if ( 1 == count( $users ) ) : ?>
-		<p><?php _e( 'You have chosen to delete the user from all networks and sites.' ); ?></p>
-	<?php else : ?>
-		<p><?php _e( 'You have chosen to delete the following users from all networks and sites.' ); ?></p>
-	<?php endif; ?>
-
-	<form action="users.php?action=dodelete" method="post">
-	<input type="hidden" name="dodelete" />
-	<?php
-	wp_nonce_field( 'ms-users-delete' );
-	$site_admins = get_super_admins();
-	$admin_out = '<option value="' . esc_attr( $current_user->ID ) . '">' . $current_user->user_login . '</option>'; ?>
-	<table class="form-table">
-	<?php foreach ( ( $allusers = (array) $_POST['allusers'] ) as $user_id ) {
-		if ( $user_id != '' && $user_id != '0' ) {
-			$delete_user = get_userdata( $user_id );
-
-			if ( ! current_user_can( 'delete_user', $delete_user->ID ) ) {
-				wp_die( sprintf( __( 'Warning! User %s cannot be deleted.' ), $delete_user->user_login ) );
-			}
-
-			if ( in_array( $delete_user->user_login, $site_admins ) ) {
-				wp_die( sprintf( __( 'Warning! User cannot be deleted. The user %s is a network administrator.' ), '<em>' . $delete_user->user_login . '</em>' ) );
-			}
-			?>
-			<tr>
-				<th scope="row"><?php echo $delete_user->user_login; ?>
-					<?php echo '<input type="hidden" name="user[]" value="' . esc_attr( $user_id ) . '" />' . "\n"; ?>
-				</th>
-			<?php $blogs = get_blogs_of_user( $user_id, true );
-
-			if ( ! empty( $blogs ) ) {
-				?>
-				<td><fieldset><p><legend><?php printf(
-					/* translators: user login */
-					__( 'What should be done with content owned by %s?' ),
-					'<em>' . $delete_user->user_login . '</em>'
-				); ?></legend></p>
-				<?php
-				foreach ( (array) $blogs as $key => $details ) {
-					$blog_users = get_users( array( 'blog_id' => $details->userblog_id, 'fields' => array( 'ID', 'user_login' ) ) );
-					if ( is_array( $blog_users ) && !empty( $blog_users ) ) {
-						$user_site = "<a href='" . esc_url( get_home_url( $details->userblog_id ) ) . "'>{$details->blogname}</a>";
-						$user_dropdown = '<label for="reassign_user" class="screen-reader-text">' . __( 'Select a user' ) . '</label>';
-						$user_dropdown .= "<select name='blog[$user_id][$key]' id='reassign_user'>";
-						$user_list = '';
-						foreach ( $blog_users as $user ) {
-							if ( ! in_array( $user->ID, $allusers ) ) {
-								$user_list .= "<option value='{$user->ID}'>{$user->user_login}</option>";
-							}
-						}
-						if ( '' == $user_list ) {
-							$user_list = $admin_out;
-						}
-						$user_dropdown .= $user_list;
-						$user_dropdown .= "</select>\n";
-						?>
-						<ul style="list-style:none;">
-							<li><?php printf( __( 'Site: %s' ), $user_site ); ?></li>
-							<li><label><input type="radio" id="delete_option0" name="delete[<?php echo $details->userblog_id . '][' . $delete_user->ID ?>]" value="delete" checked="checked" />
-							<?php _e( 'Delete all content.' ); ?></label></li>
-							<li><label><input type="radio" id="delete_option1" name="delete[<?php echo $details->userblog_id . '][' . $delete_user->ID ?>]" value="reassign" />
-							<?php _e( 'Attribute all content to:' ); ?></label>
-							<?php echo $user_dropdown; ?></li>
-						</ul>
-						<?php
-					}
-				}
-				echo "</fieldset></td></tr>";
-			} else {
-				?>
-				<td><fieldset><p><legend><?php _e( 'User has no sites or content and will be deleted.' ); ?></legend></p>
-			<?php } ?>
-			</tr>
-		<?php
-		}
-	}
-
-	?>
-	</table>
-	<?php
-	/** This action is documented in wp-admin/users.php */
-	do_action( 'delete_user_form', $current_user );
-
-	if ( 1 == count( $users ) ) : ?>
-		<p><?php _e( 'Once you hit &#8220;Confirm Deletion&#8221;, the user will be permanently removed.' ); ?></p>
-	<?php else : ?>
-		<p><?php _e( 'Once you hit &#8220;Confirm Deletion&#8221;, these users will be permanently removed.' ); ?></p>
-	<?php endif;
-
-	submit_button( __('Confirm Deletion'), 'delete' );
-	?>
-	</form>
-	<?php
-	return true;
-}
-
-/**
- * Print JavaScript in the header on the Network Settings screen.
- *
- * @since 4.1.0
-*/
-function network_settings_add_js() {
-?>
-<script type="text/javascript">
-jQuery(document).ready( function($) {
-	var languageSelect = $( '#WPLANG' );
-	$( 'form' ).submit( function() {
-		// Don't show a spinner for English and installed languages,
-		// as there is nothing to download.
-		if ( ! languageSelect.find( 'option:selected' ).data( 'installed' ) ) {
-			$( '#submit', this ).after( '<span class="spinner language-install-spinner" />' );
-		}
-	});
-});
 </script>
 <?php
 }

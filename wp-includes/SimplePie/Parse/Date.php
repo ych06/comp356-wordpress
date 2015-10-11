@@ -613,7 +613,7 @@ class SimplePie_Parse_Date
 	 *
 	 * @final
 	 * @access public
-	 * @param callable $callback
+	 * @param callback $callback
 	 */
 	public function add_callback($callback)
 	{

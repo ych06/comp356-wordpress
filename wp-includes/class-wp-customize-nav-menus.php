@@ -464,14 +464,10 @@ final class WP_Customize_Nav_Menus {
 		) ) );
 		$menus = wp_get_nav_menus();
 
-		// Menu locations.
+		// Menu loactions.
 		$locations     = get_registered_nav_menus();
 		$num_locations = count( array_keys( $locations ) );
-		if ( 1 == $num_locations ) {
-			$description = '<p>' . __( 'Your theme supports one menu. Select which menu you would like to use.' );
-		} else {
-			$description = '<p>' . sprintf( _n( 'Your theme supports %s menu. Select which menu appears in each location.', 'Your theme supports %s menus. Select which menu appears in each location.', $num_locations ), number_format_i18n( $num_locations ) );
-		}
+		$description   = '<p>' . sprintf( _n( 'Your theme contains %s menu location. Select which menu you would like to use.', 'Your theme contains %s menu locations. Select which menu appears in each location.', $num_locations ), number_format_i18n( $num_locations ) );
 		$description  .= '</p><p>' . __( 'You can also place menus in widget areas with the Custom Menu widget.' ) . '</p>';
 
 		$this->manager->add_section( 'menu_locations', array(
@@ -615,7 +611,7 @@ final class WP_Customize_Nav_Menus {
 		if ( $post_types ) {
 			foreach ( $post_types as $slug => $post_type ) {
 				$item_types[] = array(
-					'title'  => $post_type->labels->name,
+					'title'  => $post_type->labels->singular_name,
 					'type'   => 'post_type',
 					'object' => $post_type->name,
 				);
@@ -629,7 +625,7 @@ final class WP_Customize_Nav_Menus {
 					continue;
 				}
 				$item_types[] = array(
-					'title'  => $taxonomy->labels->name,
+					'title'  => $taxonomy->labels->singular_name,
 					'type'   => 'taxonomy',
 					'object' => $taxonomy->name,
 				);
@@ -934,7 +930,7 @@ final class WP_Customize_Nav_Menus {
 			'renderQueryVar'        => self::RENDER_QUERY_VAR,
 			'renderNonceValue'      => wp_create_nonce( self::RENDER_AJAX_ACTION ),
 			'renderNoncePostKey'    => self::RENDER_NONCE_POST_KEY,
-			'requestUri'            => empty( $_SERVER['REQUEST_URI'] ) ? home_url( '/' ) : esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) ),
+			'requestUri'            => '/',
 			'theme'                 => array(
 				'stylesheet' => $this->manager->get_stylesheet(),
 				'active'     => $this->manager->is_theme_active(),
@@ -942,6 +938,10 @@ final class WP_Customize_Nav_Menus {
 			'previewCustomizeNonce' => wp_create_nonce( 'preview-customize_' . $this->manager->get_stylesheet() ),
 			'navMenuInstanceArgs'   => $this->preview_nav_menu_instance_args,
 		);
+
+		if ( ! empty( $_SERVER['REQUEST_URI'] ) ) {
+			$exports['requestUri'] = esc_url_raw( home_url( wp_unslash( $_SERVER['REQUEST_URI'] ) ) );
+		}
 
 		printf( '<script>var _wpCustomizePreviewNavMenusExports = %s;</script>', wp_json_encode( $exports ) );
 	}

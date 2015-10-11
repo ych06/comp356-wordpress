@@ -31,19 +31,30 @@ function post_submit_meta_box($post, $args = array() ) {
 <div id="save-action">
 <?php if ( 'publish' != $post->post_status && 'future' != $post->post_status && 'pending' != $post->post_status ) { ?>
 <input <?php if ( 'private' == $post->post_status ) { ?>style="display:none"<?php } ?> type="submit" name="save" id="save-post" value="<?php esc_attr_e('Save Draft'); ?>" class="button" />
-<span class="spinner"></span>
 <?php } elseif ( 'pending' == $post->post_status && $can_publish ) { ?>
 <input type="submit" name="save" id="save-post" value="<?php esc_attr_e('Save as Pending'); ?>" class="button" />
-<span class="spinner"></span>
 <?php } ?>
+<span class="spinner"></span>
 </div>
-<?php if ( is_post_type_viewable( $post_type_object ) ) : ?>
+<?php if ( $post_type_object->public ) : ?>
 <div id="preview-action">
 <?php
-$preview_link = esc_url( get_preview_post_link( $post ) );
 if ( 'publish' == $post->post_status ) {
+	$preview_link = esc_url( get_permalink( $post->ID ) );
 	$preview_button = __( 'Preview Changes' );
 } else {
+	$preview_link = set_url_scheme( get_permalink( $post->ID ) );
+
+	/**
+	 * Filter the URI of a post preview in the post submit box.
+	 *
+	 * @since 2.0.5
+	 * @since 4.0.0 $post parameter was added.
+	 *
+	 * @param string  $preview_link URI the user will be directed to for a post preview.
+	 * @param WP_Post $post         Post object.
+	 */
+	$preview_link = esc_url( apply_filters( 'preview_post_link', add_query_arg( 'preview', 'true', $preview_link ), $post ) );
 	$preview_button = __( 'Preview' );
 }
 ?>
@@ -345,7 +356,7 @@ function attachment_submit_meta_box( $post ) {
  *
  *     @type string   $id       Meta box ID.
  *     @type string   $title    Meta box title.
- *     @type callable $callback Meta box display callback.
+ *     @type callback $callback Meta box display callback.
  *     @type array    $args     Extra meta box arguments.
  * }
  */
@@ -386,7 +397,7 @@ function post_format_meta_box( $post, $box ) {
  *
  *     @type string   $id       Meta box ID.
  *     @type string   $title    Meta box title.
- *     @type callable $callback Meta box display callback.
+ *     @type callback $callback Meta box display callback.
  *     @type array    $args {
  *         Extra meta box arguments.
  *
@@ -442,7 +453,7 @@ function post_tags_meta_box( $post, $box ) {
  *
  *     @type string   $id       Meta box ID.
  *     @type string   $title    Meta box title.
- *     @type callable $callback Meta box display callback.
+ *     @type callback $callback Meta box display callback.
  *     @type array    $args {
  *         Extra meta box arguments.
  *
@@ -475,9 +486,9 @@ function post_categories_meta_box( $post, $box ) {
 
 		<div id="<?php echo $tax_name; ?>-all" class="tabs-panel">
 			<?php
-			$name = ( $tax_name == 'category' ) ? 'post_category' : 'tax_input[' . $tax_name . ']';
-			echo "<input type='hidden' name='{$name}[]' value='0' />"; // Allows for an empty term set to be sent. 0 is an invalid Term ID and will be ignored by empty() checks.
-			?>
+            $name = ( $tax_name == 'category' ) ? 'post_category' : 'tax_input[' . $tax_name . ']';
+            echo "<input type='hidden' name='{$name}[]' value='0' />"; // Allows for an empty term set to be sent. 0 is an invalid Term ID and will be ignored by empty() checks.
+            ?>
 			<ul id="<?php echo $tax_name; ?>checklist" data-wp-lists="list:<?php echo $tax_name; ?>" class="categorychecklist form-no-clear">
 				<?php wp_terms_checklist( $post->ID, array( 'taxonomy' => $tax_name, 'popular_cats' => $popular_ids ) ); ?>
 			</ul>
@@ -498,44 +509,7 @@ function post_categories_meta_box( $post, $box ) {
 					<label class="screen-reader-text" for="new<?php echo $tax_name; ?>_parent">
 						<?php echo $taxonomy->labels->parent_item_colon; ?>
 					</label>
-					<?php
-					$parent_dropdown_args = array(
-						'taxonomy'         => $tax_name,
-						'hide_empty'       => 0,
-						'name'             => 'new' . $tax_name . '_parent',
-						'orderby'          => 'name',
-						'hierarchical'     => 1,
-						'show_option_none' => '&mdash; ' . $taxonomy->labels->parent_item . ' &mdash;',
-					);
-
-					/**
-					 * Filter the arguments for the taxonomy parent dropdown on the Post Edit page.
-					 *
-					 * @since 4.4.0
-					 *
-					 * @param array $parent_dropdown_args {
-					 *     Optional. Array of arguments to generate parent dropdown.
-					 *
-					 *     @type string   $taxonomy         Name of the taxonomy to retrieve.
-					 *     @type bool     $hide_if_empty    True to skip generating markup if no
-					 *                                      categories are found. Default 0.
-					 *     @type string   $name             Value for the 'name' attribute
-					 *                                      of the select element.
-					 *                                      Default "new{$tax_name}_parent".
-					 *     @type string   $orderby          Which column to use for ordering
-					 *                                      terms. Default 'name'.
-					 *     @type bool|int $hierarchical     Whether to traverse the taxonomy
-					 *                                      hierarchy. Default 1.
-					 *     @type string   $show_option_none Text to display for the "none" option.
-					 *                                      Default "&mdash; {$parent} &mdash;",
-					 *                                      where `$parent` is 'parent_item'
-					 *                                      taxonomy label.
-					 * }
-					 */
-					$parent_dropdown_args = apply_filters( 'post_edit_category_parent_dropdown_args', $parent_dropdown_args );
-
-					wp_dropdown_categories( $parent_dropdown_args );
-					?>
+					<?php wp_dropdown_categories( array( 'taxonomy' => $tax_name, 'hide_empty' => 0, 'name' => 'new' . $tax_name . '_parent', 'orderby' => 'name', 'hierarchical' => 1, 'show_option_none' => '&mdash; ' . $taxonomy->labels->parent_item . ' &mdash;' ) ); ?>
 					<input type="button" id="<?php echo $tax_name; ?>-add-submit" data-wp-lists="add:<?php echo $tax_name; ?>checklist:<?php echo $tax_name; ?>-add" class="button category-add-submit" value="<?php echo esc_attr( $taxonomy->labels->add_new_item ); ?>" />
 					<?php wp_nonce_field( 'add-' . $tax_name, '_ajax_nonce-add-' . $tax_name, false ); ?>
 					<span id="<?php echo $tax_name; ?>-ajax-response"></span>
@@ -678,7 +652,7 @@ function post_comment_meta_box( $post ) {
 		}
 
 		?>
-		<p class="hide-if-no-js" id="show-comments"><a href="#commentstatusdiv" onclick="commentsBox.load(<?php echo $total; ?>);return false;"><?php _e('Show comments'); ?></a> <span class="spinner"></span></p>
+		<p class="hide-if-no-js" id="show-comments"><a href="#commentstatusdiv" onclick="commentsBox.get(<?php echo $total; ?>);return false;"><?php _e('Show comments'); ?></a> <span class="spinner"></span></p>
 		<?php
 	}
 
@@ -694,9 +668,8 @@ function post_comment_meta_box( $post ) {
  */
 function post_slug_meta_box($post) {
 /** This filter is documented in wp-admin/edit-tag-form.php */
-$editable_slug = apply_filters( 'editable_slug', $post->post_name, $post );
 ?>
-<label class="screen-reader-text" for="post_name"><?php _e('Slug') ?></label><input name="post_name" type="text" size="13" id="post_name" value="<?php echo esc_attr( $editable_slug ); ?>" />
+<label class="screen-reader-text" for="post_name"><?php _e('Slug') ?></label><input name="post_name" type="text" size="13" id="post_name" value="<?php echo esc_attr( apply_filters( 'editable_slug', $post->post_name ) ); ?>" />
 <?php
 }
 
@@ -778,18 +751,7 @@ function page_attributes_meta_box($post) {
 	if ( 'page' == $post->post_type && 0 != count( get_page_templates( $post ) ) && get_option( 'page_for_posts' ) != $post->ID ) {
 		$template = !empty($post->page_template) ? $post->page_template : false;
 		?>
-<p><strong><?php _e('Template') ?></strong><?php
-	/**
-	 * Fires immediately after the heading inside the 'Template' section
-	 * of the 'Page Attributes' meta box.
-	 *
-	 * @since 4.4.0
-	 *
-	 * @param string  $template The template used for the current post.
-	 * @param WP_Post $post     The current post.
-	 */
-	do_action( 'page_attributes_meta_box_template', $template, $post );
-?></p>
+<p><strong><?php _e('Template') ?></strong></p>
 <label class="screen-reader-text" for="page_template"><?php _e('Page Template') ?></label><select name="page_template" id="page_template">
 <?php
 /**

@@ -153,7 +153,7 @@ function wp_install_defaults( $user_id ) {
 	$first_post_guid = get_option( 'home' ) . '/?p=1';
 
 	if ( is_multisite() ) {
-		$first_post = get_network_option( 'first_post' );
+		$first_post = get_site_option( 'first_post' );
 
 		if ( empty($first_post) )
 			$first_post = __( 'Welcome to <a href="SITE_URL">SITE_NAME</a>. This is your first post. Edit or delete it, then start writing!' );
@@ -189,9 +189,9 @@ function wp_install_defaults( $user_id ) {
 	$first_comment = __('Hi, this is a comment.
 To delete a comment, just log in and view the post&#039;s comments. There you will have the option to edit or delete them.');
 	if ( is_multisite() ) {
-		$first_comment_author = get_network_option( 'first_comment_author', $first_comment_author );
-		$first_comment_url = get_network_option( 'first_comment_url', network_home_url() );
-		$first_comment = get_network_option( 'first_comment', $first_comment );
+		$first_comment_author = get_site_option( 'first_comment_author', $first_comment_author );
+		$first_comment_url = get_site_option( 'first_comment_url', network_home_url() );
+		$first_comment = get_site_option( 'first_comment', $first_comment );
 	}
 	$wpdb->insert( $wpdb->comments, array(
 		'comment_post_ID' => 1,
@@ -214,7 +214,7 @@ To delete a comment, just log in and view the post&#039;s comments. There you wi
 
 As a new WordPress user, you should go to <a href=\"%s\">your dashboard</a> to delete this page and create new pages for your content. Have fun!" ), admin_url() );
 	if ( is_multisite() )
-		$first_page = get_network_option( 'first_page', $first_page );
+		$first_page = get_site_option( 'first_page', $first_page );
 	$first_post_guid = get_option('home') . '/?page_id=2';
 	$wpdb->insert( $wpdb->posts, array(
 		'post_author' => $user_id,
@@ -538,9 +538,6 @@ function upgrade_all() {
 	if ( $wp_current_db_version < 33056 )
 		upgrade_431();
 
-	if ( $wp_current_db_version < 34030 )
-		upgrade_440();
-
 	maybe_disable_link_manager();
 
 	maybe_disable_automattic_widgets();
@@ -562,7 +559,7 @@ function upgrade_100() {
 	// Get the title and ID of every post, post_name to check if it already has a value
 	$posts = $wpdb->get_results("SELECT ID, post_title, post_name FROM $wpdb->posts WHERE post_name = ''");
 	if ($posts) {
-		foreach ($posts as $post) {
+		foreach($posts as $post) {
 			if ('' == $post->post_name) {
 				$newtitle = sanitize_title($post->post_title);
 				$wpdb->query( $wpdb->prepare("UPDATE $wpdb->posts SET post_name = %s WHERE ID = %d", $newtitle, $post->ID) );
@@ -702,7 +699,7 @@ function upgrade_130() {
 	// Remove extraneous backslashes.
 	$posts = $wpdb->get_results("SELECT ID, post_title, post_content, post_excerpt, guid, post_date, post_name, post_status, post_author FROM $wpdb->posts");
 	if ($posts) {
-		foreach ($posts as $post) {
+		foreach($posts as $post) {
 			$post_content = addslashes(deslash($post->post_content));
 			$post_title = addslashes(deslash($post->post_title));
 			$post_excerpt = addslashes(deslash($post->post_excerpt));
@@ -719,7 +716,7 @@ function upgrade_130() {
 	// Remove extraneous backslashes.
 	$comments = $wpdb->get_results("SELECT comment_ID, comment_author, comment_content FROM $wpdb->comments");
 	if ($comments) {
-		foreach ($comments as $comment) {
+		foreach($comments as $comment) {
 			$comment_content = deslash($comment->comment_content);
 			$comment_author = deslash($comment->comment_author);
 
@@ -730,7 +727,7 @@ function upgrade_130() {
 	// Remove extraneous backslashes.
 	$links = $wpdb->get_results("SELECT link_id, link_name, link_description FROM $wpdb->links");
 	if ($links) {
-		foreach ($links as $link) {
+		foreach($links as $link) {
 			$link_name = deslash($link->link_name);
 			$link_description = deslash($link->link_description);
 
@@ -1208,7 +1205,7 @@ function upgrade_280() {
 	if ( is_multisite() ) {
 		$start = 0;
 		while( $rows = $wpdb->get_results( "SELECT option_name, option_value FROM $wpdb->options ORDER BY option_id LIMIT $start, 20" ) ) {
-			foreach ( $rows as $row ) {
+			foreach( $rows as $row ) {
 				$value = $row->option_value;
 				if ( !@unserialize( $value ) )
 					$value = stripslashes( $value );
@@ -1255,8 +1252,8 @@ function upgrade_300() {
 	if ( $wp_current_db_version < 15093 )
 		populate_roles_300();
 
-	if ( $wp_current_db_version < 14139 && is_multisite() && is_main_site() && ! defined( 'MULTISITE' ) && get_network_option( 'siteurl' ) === false )
-		add_network_option( 'siteurl', '' );
+	if ( $wp_current_db_version < 14139 && is_multisite() && is_main_site() && ! defined( 'MULTISITE' ) && get_site_option( 'siteurl' ) === false )
+		add_site_option( 'siteurl', '' );
 
 	// 3.0 screen options key name changes.
 	if ( wp_should_upgrade_global_tables() ) {
@@ -1599,22 +1596,6 @@ function upgrade_431() {
 }
 
 /**
- * Executes changes made in WordPress 4.4.0.
- *
- * @since 4.4.0
- *
- * @global int  $wp_current_db_version Current version.
- * @global wpdb $wpdb                  WordPress database abstraction object.
- */
-function upgrade_440() {
-	global $wp_current_db_version, $wpdb;
-
-	if ( $wp_current_db_version < 34030 ) {
-		$wpdb->query( "ALTER TABLE {$wpdb->options} MODIFY option_name VARCHAR(191)" );
-	}
-}
-
-/**
  * Executes network-level upgrade routines.
  *
  * @since 3.0.0
@@ -1643,27 +1624,27 @@ function upgrade_network() {
 
 	// 2.8.
 	if ( $wp_current_db_version < 11549 ) {
-		$wpmu_sitewide_plugins = get_network_option( 'wpmu_sitewide_plugins' );
-		$active_sitewide_plugins = get_network_option( 'active_sitewide_plugins' );
+		$wpmu_sitewide_plugins = get_site_option( 'wpmu_sitewide_plugins' );
+		$active_sitewide_plugins = get_site_option( 'active_sitewide_plugins' );
 		if ( $wpmu_sitewide_plugins ) {
 			if ( !$active_sitewide_plugins )
 				$sitewide_plugins = (array) $wpmu_sitewide_plugins;
 			else
 				$sitewide_plugins = array_merge( (array) $active_sitewide_plugins, (array) $wpmu_sitewide_plugins );
 
-			update_network_option( 'active_sitewide_plugins', $sitewide_plugins );
+			update_site_option( 'active_sitewide_plugins', $sitewide_plugins );
 		}
-		delete_network_option( 'wpmu_sitewide_plugins' );
-		delete_network_option( 'deactivated_sitewide_plugins' );
+		delete_site_option( 'wpmu_sitewide_plugins' );
+		delete_site_option( 'deactivated_sitewide_plugins' );
 
 		$start = 0;
 		while( $rows = $wpdb->get_results( "SELECT meta_key, meta_value FROM {$wpdb->sitemeta} ORDER BY meta_id LIMIT $start, 20" ) ) {
-			foreach ( $rows as $row ) {
+			foreach( $rows as $row ) {
 				$value = $row->meta_value;
 				if ( !@unserialize( $value ) )
 					$value = stripslashes( $value );
 				if ( $value !== $row->meta_value ) {
-					update_network_option( $row->meta_key, $value );
+					update_site_option( $row->meta_key, $value );
 				}
 			}
 			$start += 20;
@@ -1672,22 +1653,22 @@ function upgrade_network() {
 
 	// 3.0
 	if ( $wp_current_db_version < 13576 )
-		update_network_option( 'global_terms_enabled', '1' );
+		update_site_option( 'global_terms_enabled', '1' );
 
 	// 3.3
 	if ( $wp_current_db_version < 19390 )
-		update_network_option( 'initial_db_version', $wp_current_db_version );
+		update_site_option( 'initial_db_version', $wp_current_db_version );
 
 	if ( $wp_current_db_version < 19470 ) {
-		if ( false === get_network_option( 'active_sitewide_plugins' ) )
-			update_network_option( 'active_sitewide_plugins', array() );
+		if ( false === get_site_option( 'active_sitewide_plugins' ) )
+			update_site_option( 'active_sitewide_plugins', array() );
 	}
 
 	// 3.4
 	if ( $wp_current_db_version < 20148 ) {
 		// 'allowedthemes' keys things by stylesheet. 'allowed_themes' keyed things by name.
-		$allowedthemes  = get_network_option( 'allowedthemes'  );
-		$allowed_themes = get_network_option( 'allowed_themes' );
+		$allowedthemes  = get_site_option( 'allowedthemes'  );
+		$allowed_themes = get_site_option( 'allowed_themes' );
 		if ( false === $allowedthemes && is_array( $allowed_themes ) && $allowed_themes ) {
 			$converted = array();
 			$themes = wp_get_themes();
@@ -1695,22 +1676,22 @@ function upgrade_network() {
 				if ( isset( $allowed_themes[ $theme_data->get('Name') ] ) )
 					$converted[ $stylesheet ] = true;
 			}
-			update_network_option( 'allowedthemes', $converted );
-			delete_network_option( 'allowed_themes' );
+			update_site_option( 'allowedthemes', $converted );
+			delete_site_option( 'allowed_themes' );
 		}
 	}
 
 	// 3.5
 	if ( $wp_current_db_version < 21823 )
-		update_network_option( 'ms_files_rewriting', '1' );
+		update_site_option( 'ms_files_rewriting', '1' );
 
 	// 3.5.2
 	if ( $wp_current_db_version < 24448 ) {
-		$illegal_names = get_network_option( 'illegal_names' );
+		$illegal_names = get_site_option( 'illegal_names' );
 		if ( is_array( $illegal_names ) && count( $illegal_names ) === 1 ) {
 			$illegal_name = reset( $illegal_names );
 			$illegal_names = explode( ' ', $illegal_name );
-			update_network_option( 'illegal_names', $illegal_names );
+			update_site_option( 'illegal_names', $illegal_names );
 		}
 	}
 
@@ -1740,7 +1721,7 @@ function upgrade_network() {
 		if ( wp_should_upgrade_global_tables() ) {
 			$upgrade = false;
 			$indexes = $wpdb->get_results( "SHOW INDEXES FROM $wpdb->signups" );
-			foreach ( $indexes as $index ) {
+			foreach( $indexes as $index ) {
 				if ( 'domain_path' == $index->Key_name && 'domain' == $index->Column_name && 140 != $index->Sub_part ) {
 					$upgrade = true;
 					break;
@@ -2044,7 +2025,7 @@ function dbDelta( $queries = '', $execute = true ) {
 	$for_update = array();
 
 	// Create a tablename index for an array ($cqueries) of queries
-	foreach ($queries as $qry) {
+	foreach($queries as $qry) {
 		if ( preg_match( "|CREATE TABLE ([^ ]*)|", $qry, $matches ) ) {
 			$cqueries[ trim( $matches[1], '`' ) ] = $qry;
 			$for_update[$matches[1]] = 'Created table '.$matches[1];
@@ -2233,7 +2214,7 @@ function dbDelta( $queries = '', $execute = true ) {
 					"$index_string ($alt_index_columns)",
 				);
 
-				foreach ( $index_strings as $index_string ) {
+				foreach( $index_strings as $index_string ) {
 					if ( ! ( ( $aindex = array_search( $index_string, $indices ) ) === false ) ) {
 						unset( $indices[ $aindex ] );
 						break;
@@ -2284,7 +2265,7 @@ function dbDelta( $queries = '', $execute = true ) {
 function make_db_current( $tables = 'all' ) {
 	$alterations = dbDelta( $tables );
 	echo "<ol>\n";
-	foreach ($alterations as $alteration) echo "<li>$alteration</li>\n";
+	foreach($alterations as $alteration) echo "<li>$alteration</li>\n";
 	echo "</ol>\n";
 }
 
@@ -2627,14 +2608,6 @@ function pre_schema_upgrade() {
 		$wpdb->query( "ALTER TABLE $wpdb->commentmeta DROP INDEX meta_key, ADD INDEX meta_key(meta_key(191))" );
 		$wpdb->query( "ALTER TABLE $wpdb->postmeta DROP INDEX meta_key, ADD INDEX meta_key(meta_key(191))" );
 		$wpdb->query( "ALTER TABLE $wpdb->posts DROP INDEX post_name, ADD INDEX post_name(post_name(191))" );
-	}
-
-	// Upgrade versions prior to 4.4.
-	if ( $wp_current_db_version < 34370 ) {
-		// If compatible termmeta table is found, use it, but enforce a proper index.
-		if ( $wpdb->get_var( "SHOW TABLES LIKE '{$wpdb->termmeta}'" ) && $wpdb->get_results( "SHOW INDEX FROM {$wpdb->termmeta} WHERE Column_name = 'meta_key'" ) ) {
-			$wpdb->query( "ALTER TABLE $wpdb->termmeta DROP INDEX meta_key, ADD INDEX meta_key(meta_key(191))" );
-		}
 	}
 }
 

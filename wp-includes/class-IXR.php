@@ -540,6 +540,7 @@ EOD;
             $xml = '<?xml version="1.0"?>'."\n".$xml;
         $length = strlen($xml);
         header('Connection: close');
+        header('Content-Length: '.$length);
         if ($charset)
             header('Content-Type: text/xml; charset='.$charset);
         else

@@ -4,20 +4,9 @@
  *
  * @package WordPress
  * @subpackage Theme
- * @since 3.4.0
  */
-final class WP_Theme implements ArrayAccess {
 
-	/**
-	 * Whether the theme has been marked as updateable.
-	 *
-	 * @since 4.4.0
-	 * @access public
-	 * @var bool
-	 *
-	 * @see WP_MS_Themes_List_Table
-	 */
-	public $update = false;
+final class WP_Theme implements ArrayAccess {
 
 	/**
 	 * Headers for style.css files.
@@ -1191,7 +1180,7 @@ final class WP_Theme implements ArrayAccess {
 	public static function get_allowed_on_network() {
 		static $allowed_themes;
 		if ( ! isset( $allowed_themes ) )
-			$allowed_themes = (array) get_network_option( 'allowedthemes' );
+			$allowed_themes = (array) get_site_option( 'allowedthemes' );
 		return $allowed_themes;
 	}
 

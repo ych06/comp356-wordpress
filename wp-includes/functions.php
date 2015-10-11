@@ -132,7 +132,7 @@ function date_i18n( $dateformatstring, $unixtimestamp = false, $gmt = false ) {
 		if ( $timezone_string ) {
 			$timezone_object = timezone_open( $timezone_string );
 			$date_object = date_create( null, $timezone_object );
-			foreach ( $timezone_formats as $timezone_format ) {
+			foreach( $timezone_formats as $timezone_format ) {
 				if ( false !== strpos( $dateformatstring, $timezone_format ) ) {
 					$formatted = date_format( $date_object, $timezone_format );
 					$dateformatstring = ' '.$dateformatstring;
@@ -564,6 +564,62 @@ function do_enclose( $content, $post_ID ) {
 }
 
 /**
+ * Perform a HTTP HEAD or GET request.
+ *
+ * If $file_path is a writable filename, this will do a GET request and write
+ * the file to that path.
+ *
+ * @since 2.5.0
+ *
+ * @param string      $url       URL to fetch.
+ * @param string|bool $file_path Optional. File path to write request to. Default false.
+ * @param int         $red       Optional. The number of Redirects followed, Upon 5 being hit,
+ *                               returns false. Default 1.
+ * @return bool|string False on failure and string of headers if HEAD request.
+ */
+function wp_get_http( $url, $file_path = false, $red = 1 ) {
+	@set_time_limit( 60 );
+
+	if ( $red > 5 )
+		return false;
+
+	$options = array();
+	$options['redirection'] = 5;
+
+	if ( false == $file_path )
+		$options['method'] = 'HEAD';
+	else
+		$options['method'] = 'GET';
+
+	$response = wp_safe_remote_request( $url, $options );
+
+	if ( is_wp_error( $response ) )
+		return false;
+
+	$headers = wp_remote_retrieve_headers( $response );
+	$headers['response'] = wp_remote_retrieve_response_code( $response );
+
+	// WP_HTTP no longer follows redirects for HEAD requests.
+	if ( 'HEAD' == $options['method'] && in_array($headers['response'], array(301, 302)) && isset( $headers['location'] ) ) {
+		return wp_get_http( $headers['location'], $file_path, ++$red );
+	}
+
+	if ( false == $file_path )
+		return $headers;
+
+	// GET request - write it to the supplied filename
+	$out_fp = fopen($file_path, 'w');
+	if ( !$out_fp )
+		return $headers;
+
+	fwrite( $out_fp,  wp_remote_retrieve_body( $response ) );
+	fclose($out_fp);
+	clearstatcache();
+
+	return $headers;
+}
+
+/**
  * Retrieve HTTP Headers from URL.
  *
  * @since 1.5.1
@@ -670,39 +726,22 @@ function _http_build_query( $data, $prefix = null, $sep = null, $key = '', $urle
 }
 
 /**
- * Retrieves a modified URL query string.
+ * Retrieve a modified URL query string.
  *
- * You can rebuild the URL and append query variables to the URL query by using this function.
- * There are two ways to use this function; either a single key and value, or an associative array.
+ * You can rebuild the URL and append a new query variable to the URL query by
+ * using this function. You can also retrieve the full URL with query data.
  *
- * Using a single key and value:
- *
- *     add_query_arg( 'key', 'value', 'http://example.com' );
- *
- * Using an associative array:
- * 
- *     add_query_arg( array(
- *         'key1' => 'value1',
- *         'key2' => 'value2',
- *     ), 'http://example.com' );
- * 
- * Omitting the URL from either use results in the current URL being used
- * (the value of `$_SERVER['REQUEST_URI']`).
- * 
- * Values are expected to be encoded appropriately with urlencode() or rawurlencode().
- *
- * Setting any query variable's value to boolean false removes the key (see remove_query_arg()).
- *
- * Important: The return value of add_query_arg() is not escaped by default. Output should be
- * late-escaped with esc_url() or similar to help prevent vulnerability to cross-site scripting
- * (XSS) attacks.
+ * Adding a single key & value or an associative array. Setting a key value to
+ * an empty string removes the key. Omitting oldquery_or_uri uses the $_SERVER
+ * value. Additional values provided are expected to be encoded appropriately
+ * with urlencode() or rawurlencode().
  *
  * @since 1.5.0
  *
- * @param string|array $key   Either a query variable key, or an associative array of query variables.
- * @param string       $value Optional. Either a query variable value, or a URL to act upon.
- * @param string       $url   Optional. A URL to act upon.
- * @return string New URL query string (unescaped).
+ * @param string|array $param1 Either newkey or an associative_array.
+ * @param string       $param2 Either newvalue or oldquery or URI.
+ * @param string       $param3 Optional. Old query or URI.
+ * @return string New URL query string.
  */
 function add_query_arg() {
 	$args = func_get_args();
@@ -768,12 +807,12 @@ function add_query_arg() {
 }
 
 /**
- * Removes an item or items from a query string.
+ * Removes an item or list from the query string.
  *
  * @since 1.5.0
  *
  * @param string|array $key   Query key or keys to remove.
- * @param bool|string  $query Optional. When false uses the current URL. Default false.
+ * @param bool|string  $query Optional. When false uses the $_SERVER value. Default false.
  * @return string New URL query string.
  */
 function remove_query_arg( $key, $query = false ) {
@@ -783,47 +822,6 @@ function remove_query_arg( $key, $query = false ) {
 		return $query;
 	}
 	return add_query_arg( $key, false, $query );
-}
-
-/**
- * Returns an array of single-use query variable names that can be removed from a URL.
- *
- * @since 4.4.0
- *
- * @return array An array of parameters to remove from the URL.
- */
-function wp_removable_query_args() {
-	$removable_query_args = array(
-		'activate',
-		'activated',
-		'approved',
-		'deactivate',
-		'deleted',
-		'disabled',
-		'enabled',
-		'error',
-		'locked',
-		'message',
-		'same',
-		'saved',
-		'settings-updated',
-		'skipped',
-		'spammed',
-		'trashed',
-		'unspammed',
-		'untrashed',
-		'update',
-		'updated',
-	);
-
-	/**
-	 * Filter the list of query variables to remove.
-	 *
-	 * @since 4.2.0
-	 *
-	 * @param array $removable_query_args An array of query variables to remove from a URL.
-	 */
-	return apply_filters( 'removable_query_args', $removable_query_args );
 }
 
 /**
@@ -1082,7 +1080,7 @@ function nocache_headers() {
 		}
 	}
 
-	foreach ( $headers as $name => $field_value )
+	foreach( $headers as $name => $field_value )
 		@header("{$name}: {$field_value}");
 }
 
@@ -1592,12 +1590,10 @@ function path_join( $base, $path ) {
 /**
  * Normalize a filesystem path.
  *
- * On windows systems, replaces backslashes with forward slashes
- * and forces upper-case drive letters.
- * Ensures that no duplicate slashes exist.
+ * Replaces backslashes with forward slashes for Windows systems, and ensures
+ * no duplicate slashes exist.
  *
  * @since 3.9.0
- * @since 4.4.0 Ensures upper-case drive letters on Windows systems.
  *
  * @param string $path Path to normalize.
  * @return string Normalized path.
@@ -1605,9 +1601,6 @@ function path_join( $base, $path ) {
 function wp_normalize_path( $path ) {
 	$path = str_replace( '\\', '/', $path );
 	$path = preg_replace( '|/+|','/', $path );
-	if ( ':' === substr( $path, 1, 1 ) ) {
-		$path = ucfirst( $path );
-	}
 	return $path;
 }
 
@@ -1762,7 +1755,7 @@ function wp_upload_dir( $time = null ) {
 	 * Honor the value of UPLOADS. This happens as long as ms-files rewriting is disabled.
 	 * We also sometimes obey UPLOADS when rewriting is enabled -- see the next block.
 	 */
-	if ( defined( 'UPLOADS' ) && ! ( is_multisite() && get_network_option( 'ms_files_rewriting' ) ) ) {
+	if ( defined( 'UPLOADS' ) && ! ( is_multisite() && get_site_option( 'ms_files_rewriting' ) ) ) {
 		$dir = ABSPATH . UPLOADS;
 		$url = trailingslashit( $siteurl ) . UPLOADS;
 	}
@@ -1770,7 +1763,7 @@ function wp_upload_dir( $time = null ) {
 	// If multisite (and if not the main site in a post-MU network)
 	if ( is_multisite() && ! ( is_main_network() && is_main_site() && defined( 'MULTISITE' ) ) ) {
 
-		if ( ! get_network_option( 'ms_files_rewriting' ) ) {
+		if ( ! get_site_option( 'ms_files_rewriting' ) ) {
 			/*
 			 * If ms-files rewriting is disabled (networks created post-3.5), it is fairly
 			 * straightforward: Append sites/%d if we're not on the main site (for post-MU
@@ -1873,7 +1866,7 @@ function wp_upload_dir( $time = null ) {
  *
  * @param string   $dir                      Directory.
  * @param string   $filename                 File name.
- * @param callable $unique_filename_callback Callback. Default null.
+ * @param callback $unique_filename_callback Callback. Default null.
  * @return string New filename, if given wasn't unique.
  */
 function wp_unique_filename( $dir, $filename, $unique_filename_callback = null ) {
@@ -2010,8 +2003,7 @@ function wp_upload_bits( $name, $deprecated, $bits, $time = null ) {
 	// Compute the URL
 	$url = $upload['url'] . "/$filename";
 
-	/** This filter is documented in wp-admin/includes/file.php */
-	return apply_filters( 'wp_handle_upload', array( 'file' => $new_file, 'url' => $url, 'type' => $wp_filetype['type'], 'error' => false ), 'sideload' );
+	return array( 'file' => $new_file, 'url' => $url, 'error' => false );
 }
 
 /**
@@ -2395,7 +2387,7 @@ function wp_die( $message = '', $title = '', $args = array() ) {
 		 *
 		 * @since 3.4.0
 		 *
-		 * @param callable $function Callback function name.
+		 * @param callback $function Callback function name.
 		 */
 		$function = apply_filters( 'wp_die_ajax_handler', '_ajax_wp_die_handler' );
 	} elseif ( defined( 'XMLRPC_REQUEST' ) && XMLRPC_REQUEST ) {
@@ -2404,7 +2396,7 @@ function wp_die( $message = '', $title = '', $args = array() ) {
 		 *
 		 * @since 3.4.0
 		 *
-		 * @param callable $function Callback function name.
+		 * @param callback $function Callback function name.
 		 */
 		$function = apply_filters( 'wp_die_xmlrpc_handler', '_xmlrpc_wp_die_handler' );
 	} else {
@@ -2413,7 +2405,7 @@ function wp_die( $message = '', $title = '', $args = array() ) {
 		 *
 		 * @since 3.0.0
 		 *
-		 * @param callable $function Callback function name.
+		 * @param callback $function Callback function name.
 		 */
 		$function = apply_filters( 'wp_die_handler', '_default_wp_die_handler' );
 	}
@@ -2587,11 +2579,9 @@ function _default_wp_die_handler( $message, $title = '', $args = array() ) {
 		 	box-shadow: inset 0 2px 5px -3px rgba( 0, 0, 0, 0.5 );
 		}
 
-		<?php
-		if ( 'rtl' == $text_direction ) {
-			echo 'body { font-family: Tahoma, Arial; }';
-		}
-		?>
+		<?php if ( 'rtl' == $text_direction ) : ?>
+		body { font-family: Tahoma, Arial; }
+		<?php endif; ?>
 	</style>
 </head>
 <body id="error-page">
@@ -2687,7 +2677,7 @@ function wp_json_encode( $data, $options = 0, $depth = 512 ) {
 		$args = array( $data );
 	}
 
-	$json = @call_user_func_array( 'json_encode', $args );
+	$json = call_user_func_array( 'json_encode', $args );
 
 	// If json_encode() was successful, no need to do more sanity checking.
 	// ... unless we're in an old version of PHP, and json_encode() returned
@@ -3705,7 +3695,7 @@ function iis7_supports_permalinks() {
 		 * Lastly we make sure that PHP is running via FastCGI. This is important because if it runs
 		 * via ISAPI then pretty permalinks will not work.
 		 */
-		$supports_permalinks = class_exists( 'DOMDocument', false ) && isset($_SERVER['IIS_UrlRewriteModule']) && ( PHP_SAPI == 'cgi-fcgi' );
+		$supports_permalinks = class_exists('DOMDocument') && isset($_SERVER['IIS_UrlRewriteModule']) && ( PHP_SAPI == 'cgi-fcgi' );
 	}
 
 	/**
@@ -3765,6 +3755,20 @@ function is_ssl() {
 		return true;
 	}
 	return false;
+}
+
+/**
+ * Whether SSL login should be forced.
+ *
+ * @since 2.6.0
+ *
+ * @see force_ssl_admin()
+ *
+ * @param string|bool $force Optional Whether to force SSL login. Default null.
+ * @return bool True if forced, false if not forced.
+ */
+function force_ssl_login( $force = null ) {
+	return force_ssl_admin( $force );
 }
 
 /**
@@ -4005,7 +4009,7 @@ function global_terms_enabled() {
 		if ( ! is_null( $filter ) )
 			$global_terms = (bool) $filter;
 		else
-			$global_terms = (bool) get_network_option( 'global_terms_enabled', false );
+			$global_terms = (bool) get_site_option( 'global_terms_enabled', false );
 	}
 	return $global_terms;
 }
@@ -4271,7 +4275,7 @@ function wp_scheduled_delete() {
 			delete_comment_meta($comment_id, '_wp_trash_meta_time');
 			delete_comment_meta($comment_id, '_wp_trash_meta_status');
 		} else {
-			wp_delete_comment( $del_comment );
+			wp_delete_comment($comment_id);
 		}
 	}
 }
@@ -4463,7 +4467,7 @@ function _wp_mysql_week( $column ) {
  * @since 3.1.0
  * @access private
  *
- * @param callable $callback      Function that accepts ( ID, $callback_args ) and outputs parent_ID.
+ * @param callback $callback      Function that accepts ( ID, $callback_args ) and outputs parent_ID.
  * @param int      $start         The ID to start the loop check at.
  * @param int      $start_parent  The parent_ID of $start to use instead of calling $callback( $start ).
  *                                Use null to always use $callback
@@ -4488,7 +4492,7 @@ function wp_find_hierarchy_loop( $callback, $start, $start_parent, $callback_arg
  * @since 3.1.0
  * @access private
  *
- * @param callable $callback      Function that accepts ( ID, callback_arg, ... ) and outputs parent_ID.
+ * @param callback $callback      Function that accepts ( ID, callback_arg, ... ) and outputs parent_ID.
  * @param int      $start         The ID to start the loop check at.
  * @param array    $override      Optional. An array of ( ID => parent_ID, ... ) to use instead of $callback.
  *                                Default empty array.

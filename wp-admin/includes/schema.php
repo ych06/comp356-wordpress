@@ -57,16 +57,7 @@ function wp_get_db_schema( $scope = 'all', $blog_id = null ) {
 	$max_index_length = 191;
 
 	// Blog specific tables.
-	$blog_tables = "CREATE TABLE $wpdb->termmeta (
-  meta_id bigint(20) unsigned NOT NULL auto_increment,
-  term_id bigint(20) unsigned NOT NULL default '0',
-  meta_key varchar(255) default NULL,
-  meta_value longtext,
-  PRIMARY KEY (meta_id),
-  KEY term_id (term_id),
-  KEY meta_key (meta_key($max_index_length))
-) $charset_collate;
-CREATE TABLE $wpdb->terms (
+	$blog_tables = "CREATE TABLE $wpdb->terms (
  term_id bigint(20) unsigned NOT NULL auto_increment,
  name varchar(200) NOT NULL default '',
  slug varchar(200) NOT NULL default '',
@@ -144,7 +135,7 @@ CREATE TABLE $wpdb->links (
 ) $charset_collate;
 CREATE TABLE $wpdb->options (
   option_id bigint(20) unsigned NOT NULL auto_increment,
-  option_name varchar(191) NOT NULL default '',
+  option_name varchar(64) NOT NULL default '',
   option_value longtext NOT NULL,
   autoload varchar(20) NOT NULL default 'yes',
   PRIMARY KEY  (option_id),
@@ -421,6 +412,7 @@ function populate_options() {
 	'moderation_notify' => 1,
 	'permalink_structure' => '',
 	'gzipcompression' => 0,
+	'hack_file' => 0,
 	'blog_charset' => 'UTF-8',
 	'moderation_keys' => '',
 	'active_plugins' => array(),
@@ -475,13 +467,14 @@ function populate_options() {
 	// 2.7
 	'large_size_w' => 1024,
 	'large_size_h' => 1024,
-	'image_default_link_type' => 'none',
+	'image_default_link_type' => 'file',
 	'image_default_size' => '',
 	'image_default_align' => '',
 	'close_comments_for_old_posts' => 0,
 	'close_comments_days_old' => 14,
 	'thread_comments' => 1,
 	'thread_comments_depth' => 5,
+	'page_comments' => 0,
 	'comments_per_page' => 50,
 	'default_comments_page' => 'newest',
 	'comment_order' => 'asc',
@@ -566,7 +559,7 @@ function populate_options() {
 		'can_compress_scripts', 'page_uris', 'update_core', 'update_plugins', 'update_themes', 'doing_cron',
 		'random_seed', 'rss_excerpt_length', 'secret', 'use_linksupdate', 'default_comment_status_page',
 		'wporg_popular_tags', 'what_to_show', 'rss_language', 'language', 'enable_xmlrpc', 'enable_app',
-		'embed_autourls', 'default_post_edit_rows', 'page_comments',
+		'embed_autourls', 'default_post_edit_rows',
 	);
 	foreach ( $unusedoptions as $option )
 		delete_option($option);
@@ -902,7 +895,7 @@ function populate_network( $network_id = 1, $domain = '', $email = '', $site_nam
 
 	$site_user = get_user_by( 'email', $email );
 	if ( ! is_email( $email ) )
-		$errors->add( 'invalid_email', __( 'You must provide a valid email address.' ) );
+		$errors->add( 'invalid_email', __( 'You must provide a valid e-mail address.' ) );
 
 	if ( $errors->get_error_code() )
 		return $errors;
@@ -935,7 +928,7 @@ function populate_network( $network_id = 1, $domain = '', $email = '', $site_nam
 			}
 		}
 	} else {
-		$site_admins = get_network_option( 'site_admins' );
+		$site_admins = get_site_option( 'site_admins' );
 	}
 
 	/* translators: Do not translate USERNAME, SITE_NAME, BLOG_URL, PASSWORD: those are placeholders. */
@@ -985,10 +978,10 @@ We hope you enjoy your new site. Thanks!
 		// @todo - network admins should have a method of editing the network siteurl (used for cookie hash)
 		'siteurl' => get_option( 'siteurl' ) . '/',
 		'add_new_users' => '0',
-		'upload_space_check_disabled' => is_multisite() ? get_network_option( 'upload_space_check_disabled' ) : '1',
+		'upload_space_check_disabled' => is_multisite() ? get_site_option( 'upload_space_check_disabled' ) : '1',
 		'subdomain_install' => intval( $subdomain_install ),
 		'global_terms_enabled' => global_terms_enabled() ? '1' : '0',
-		'ms_files_rewriting' => is_multisite() ? get_network_option( 'ms_files_rewriting' ) : '0',
+		'ms_files_rewriting' => is_multisite() ? get_site_option( 'ms_files_rewriting' ) : '0',
 		'initial_db_version' => get_option( 'initial_db_version' ),
 		'active_sitewide_plugins' => array(),
 		'WPLANG' => get_locale(),
@@ -1054,26 +1047,12 @@ We hope you enjoy your new site. Thanks!
 
 		if ( ! $vhost_ok ) {
 			$msg = '<p><strong>' . __( 'Warning! Wildcard DNS may not be configured correctly!' ) . '</strong></p>';
-
-			$msg .= '<p>' . sprintf(
-				/* translators: %s: host name */
-				__( 'The installer attempted to contact a random hostname (%s) on your domain.' ),
-				'<code>' . $hostname . '</code>'
-			);
-			if ( ! empty ( $errstr ) ) {
-				/* translators: %s: error message */
+			$msg .= '<p>' . sprintf( __( 'The installer attempted to contact a random hostname (<code>%1$s</code>) on your domain.' ), $hostname );
+			if ( ! empty ( $errstr ) )
 				$msg .= ' ' . sprintf( __( 'This resulted in an error message: %s' ), '<code>' . $errstr . '</code>' );
-			}
 			$msg .= '</p>';
-
-			$msg .= '<p>' . sprintf(
-				/* translators: %s: asterisk symbol (*) */
-				__( 'To use a subdomain configuration, you must have a wildcard entry in your DNS. This usually means adding a %s hostname record pointing at your web server in your DNS configuration tool.' ),
-				'<code>*</code>'
-			) . '</p>';
-
+			$msg .= '<p>' . __( 'To use a subdomain configuration, you must have a wildcard entry in your DNS. This usually means adding a <code>*</code> hostname record pointing at your web server in your DNS configuration tool.' ) . '</p>';
 			$msg .= '<p>' . __( 'You can still use your site but any subdomain you create may not be accessible. If you know your DNS is correct, ignore this message.' ) . '</p>';
-
 			return new WP_Error( 'no_wildcard_dns', $msg );
 		}
 	}

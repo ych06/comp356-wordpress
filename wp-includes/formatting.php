@@ -216,31 +216,63 @@ function wptexturize( $text, $reset = false ) {
 
 	// Look for shortcodes and HTML elements.
 
-	preg_match_all( '@\[/?([^<>&/\[\]\x00-\x20]++)@', $text, $matches );
-	$tagnames = array_intersect( array_keys( $shortcode_tags ), $matches[1] );
-	$found_shortcodes = ! empty( $tagnames );
-	$shortcode_regex = $found_shortcodes ? _get_wptexturize_shortcode_regex( $tagnames ) : '';
-	$regex = _get_wptexturize_split_regex( $shortcode_regex );
+	$tagnames = array_keys( $shortcode_tags );
+	$tagregexp = join( '|', array_map( 'preg_quote', $tagnames ) );
+	$tagregexp = "(?:$tagregexp)(?![\\w-])"; // Excerpt of get_shortcode_regex().
+
+	$comment_regex =
+		  '!'           // Start of comment, after the <.
+		. '(?:'         // Unroll the loop: Consume everything until --> is found.
+		.     '-(?!->)' // Dash not followed by end of comment.
+		.     '[^\-]*+' // Consume non-dashes.
+		. ')*+'         // Loop possessively.
+		. '(?:-->)?';   // End of comment. If not found, match all input.
+
+	$shortcode_regex =
+		  '\['              // Find start of shortcode.
+		. '[\/\[]?'         // Shortcodes may begin with [/ or [[
+		. $tagregexp        // Only match registered shortcodes, because performance.
+		. '(?:'
+		.     '[^\[\]<>]+'  // Shortcodes do not contain other shortcodes. Quantifier critical.
+		. '|'
+		.     '<[^\[\]>]*>' // HTML elements permitted. Prevents matching ] before >.
+		. ')*+'             // Possessive critical.
+		. '\]'              // Find end of shortcode.
+		. '\]?';            // Shortcodes may end with ]]
+
+	$regex =
+		  '/('                   // Capture the entire match.
+		.     '<'                // Find start of element.
+		.     '(?(?=!--)'        // Is this a comment?
+		.         $comment_regex // Find end of comment.
+		.     '|'
+		.         '[^>]*>'       // Find end of element.
+		.     ')'
+		. '|'
+		.     $shortcode_regex   // Find shortcodes.
+		. ')/s';
 
 	$textarr = preg_split( $regex, $text, -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY );
 
 	foreach ( $textarr as &$curl ) {
 		// Only call _wptexturize_pushpop_element if $curl is a delimiter.
 		$first = $curl[0];
-		if ( '<' === $first ) {
-			if ( '<!--' === substr( $curl, 0, 4 ) ) {
-				// This is an HTML comment delimiter.
-				continue;
-			} else {
-				// This is an HTML element delimiter.
-				_wptexturize_pushpop_element( $curl, $no_texturize_tags_stack, $no_texturize_tags );
-			}
+		if ( '<' === $first && '<!--' === substr( $curl, 0, 4 ) ) {
+			// This is an HTML comment delimeter.
+
+			continue;
+
+		} elseif ( '<' === $first && '>' === substr( $curl, -1 ) ) {
+			// This is an HTML element delimiter.
+
+			_wptexturize_pushpop_element( $curl, $no_texturize_tags_stack, $no_texturize_tags );
 
 		} elseif ( '' === trim( $curl ) ) {
 			// This is a newline between delimiters.  Performance improves when we check this.
+
 			continue;
 
-		} elseif ( '[' === $first && $found_shortcodes && 1 === preg_match( '/^' . $shortcode_regex . '$/', $curl ) ) {
+		} elseif ( '[' === $first && 1 === preg_match( '/^' . $shortcode_regex . '$/', $curl ) ) {
 			// This is a shortcode delimiter.
 
 			if ( '[[' !== substr( $curl, 0, 2 ) && ']]' !== substr( $curl, -2 ) ) {
@@ -308,7 +340,7 @@ function wptexturize_primes( $haystack, $needle, $prime, $open_quote, $close_quo
 
 	$sentences = explode( $open_quote, $haystack );
 
-	foreach ( $sentences as $key => &$sentence ) {
+	foreach( $sentences as $key => &$sentence ) {
 		if ( false === strpos( $sentence, $needle ) ) {
 			continue;
 		} elseif ( 0 !== $key && 0 === substr_count( $sentence, $close_quote ) ) {
@@ -464,7 +496,7 @@ function wpautop( $pee, $br = true ) {
 	$allblocks = '(?:table|thead|tfoot|caption|col|colgroup|tbody|tr|td|th|div|dl|dd|dt|ul|ol|li|pre|form|map|area|blockquote|address|math|style|p|h[1-6]|hr|fieldset|legend|section|article|aside|hgroup|header|footer|nav|figure|figcaption|details|menu|summary)';
 
 	// Add a single line break above block-level opening tags.
-	$pee = preg_replace('!(<' . $allblocks . '[\s/>])!', "\n$1", $pee);
+	$pee = preg_replace('!(<' . $allblocks . '[^>]*>)!', "\n$1", $pee);
 
 	// Add a double line break below block-level closing tags.
 	$pee = preg_replace('!(</' . $allblocks . '>)!', "$1\n\n", $pee);
@@ -580,17 +612,6 @@ function wpautop( $pee, $br = true ) {
  * @return array The formatted text.
  */
 function wp_html_split( $input ) {
-	return preg_split( get_html_split_regex(), $input, -1, PREG_SPLIT_DELIM_CAPTURE );
-}
-
-/**
- * Retrieve the regular expression for an HTML element.
- *
- * @since 4.4.0
- *
- * @return string The regular expression
- */
-function get_html_split_regex() {
 	static $regex;
 
 	if ( ! isset( $regex ) ) {
@@ -611,100 +632,22 @@ function get_html_split_regex() {
 			. ')*+'         // Loop possessively.
 			. '(?:]]>)?';   // End of comment. If not found, match all input.
 
-		$escaped = 
-			  '(?='           // Is the element escaped?
-			.    '!--'
-			. '|'
-			.    '!\[CDATA\['
-			. ')'
-			. '(?(?=!-)'      // If yes, which type?
-			.     $comments
-			. '|'
-			.     $cdata
-			. ')';
-
 		$regex =
 			  '/('              // Capture the entire match.
 			.     '<'           // Find start of element.
-			.     '(?'          // Conditional expression follows.
-			.         $escaped  // Find end of escaped element.
-			.     '|'           // ... else ...
-			.         '[^>]*>?' // Find end of normal element.
+			.     '(?(?=!--)'   // Is this a comment?
+			.         $comments // Find end of comment.
+			.     '|'
+			.         '(?(?=!\[CDATA\[)' // Is this a comment?
+			.             $cdata // Find end of comment.
+			.         '|'
+			.             '[^>]*>?' // Find end of element. If not found, match all input.
+			.         ')'
 			.     ')'
-			. ')/';
+			. ')/s';
 	}
 
-	return $regex;
-}
-
-/**
- * Retrieve the combined regular expression for HTML and shortcodes.
- *
- * @access private
- * @ignore
- * @internal This function will be removed in 4.5.0 per Shortcode API Roadmap.
- * @since 4.4.0
- *
- * @param string $shortcode_regex The result from _get_wptexturize_shortcode_regex().  Optional.
- * @return string The regular expression
- */
-function _get_wptexturize_split_regex( $shortcode_regex = '' ) {
-	static $html_regex;
-
-	if ( ! isset( $html_regex ) ) {
-		$comment_regex =
-			  '!'           // Start of comment, after the <.
-			. '(?:'         // Unroll the loop: Consume everything until --> is found.
-			.     '-(?!->)' // Dash not followed by end of comment.
-			.     '[^\-]*+' // Consume non-dashes.
-			. ')*+'         // Loop possessively.
-			. '(?:-->)?';   // End of comment. If not found, match all input.
-
-		$html_regex =			 // Needs replaced with wp_html_split() per Shortcode API Roadmap.
-			  '<'                // Find start of element.
-			. '(?(?=!--)'        // Is this a comment?
-			.     $comment_regex // Find end of comment.
-			. '|'
-			.     '[^>]*>?'      // Find end of element. If not found, match all input.
-			. ')';
-	}
-
-	if ( empty( $shortcode_regex ) ) {
-		$regex = '/(' . $html_regex . ')/';
-	} else {
-		$regex = '/(' . $html_regex . '|' . $shortcode_regex . ')/';
-	}
-
-	return $regex;
-}
-
-/**
- * Retrieve the regular expression for shortcodes.
- *
- * @access private
- * @ignore
- * @internal This function will be removed in 4.5.0 per Shortcode API Roadmap.
- * @since 4.4.0
- *
- * @param array $tagnames List of shortcodes to find.
- * @return string The regular expression
- */
-function _get_wptexturize_shortcode_regex( $tagnames ) {
-	$tagregexp = join( '|', array_map( 'preg_quote', $tagnames ) );
-	$tagregexp = "(?:$tagregexp)(?=[\\s\\]\\/])"; // Excerpt of get_shortcode_regex().
-	$regex =
-		  '\['              // Find start of shortcode.
-		. '[\/\[]?'         // Shortcodes may begin with [/ or [[
-		. $tagregexp        // Only match registered shortcodes, because performance.
-		. '(?:'
-		.     '[^\[\]<>]+'  // Shortcodes do not contain other shortcodes. Quantifier critical.
-		. '|'
-		.     '<[^\[\]>]*>' // HTML elements permitted. Prevents matching ] before >.
-		. ')*+'             // Possessive critical.
-		. '\]'              // Find end of shortcode.
-		. '\]?';            // Shortcodes may end with ]]
-
-	return $regex;
+	return preg_split( $regex, $input, -1, PREG_SPLIT_DELIM_CAPTURE );
 }
 
 /**
@@ -726,7 +669,7 @@ function wp_replace_in_html_tags( $haystack, $replace_pairs ) {
 		// Extract $needle and $replace.
 		foreach ( $replace_pairs as $needle => $replace );
 
-		// Loop through delimiters (elements) only.
+		// Loop through delimeters (elements) only.
 		for ( $i = 1, $c = count( $textarr ); $i < $c; $i += 2 ) {
 			if ( false !== strpos( $textarr[$i], $needle ) ) {
 				$textarr[$i] = str_replace( $needle, $replace, $textarr[$i] );
@@ -737,7 +680,7 @@ function wp_replace_in_html_tags( $haystack, $replace_pairs ) {
 		// Extract all $needles.
 		$needles = array_keys( $replace_pairs );
 
-		// Loop through delimiters (elements) only.
+		// Loop through delimeters (elements) only.
 		for ( $i = 1, $c = count( $textarr ); $i < $c; $i += 2 ) {
 			foreach ( $needles as $needle ) {
 				if ( false !== strpos( $textarr[$i], $needle ) ) {
@@ -822,7 +765,7 @@ function shortcode_unautop( $pee ) {
 		. ')'
 		. '(?:' . $spaces . ')*+'            // optional trailing whitespace
 		. '<\\/p>'                           // closing paragraph
-		. '/';
+		. '/s';
 
 	return preg_replace( $pattern, '$1', $pee );
 }
@@ -873,14 +816,10 @@ function seems_utf8( $str ) {
  *
  * @staticvar string $_charset
  *
- * @param string     $string         The text which is to be encoded.
- * @param int|string $quote_style    Optional. Converts double quotes if set to ENT_COMPAT,
- *                                   both single and double if set to ENT_QUOTES or none if set to ENT_NOQUOTES.
- *                                   Also compatible with old values; converting single quotes if set to 'single',
- *                                   double if set to 'double' or both if otherwise set.
- *                                   Default is ENT_NOQUOTES.
- * @param string     $charset        Optional. The character encoding of the string. Default is false.
- * @param bool       $double_encode  Optional. Whether to encode existing html entities. Default is false.
+ * @param string $string         The text which is to be encoded.
+ * @param int    $quote_style    Optional. Converts double quotes if set to ENT_COMPAT, both single and double if set to ENT_QUOTES or none if set to ENT_NOQUOTES. Also compatible with old values; converting single quotes if set to 'single', double if set to 'double' or both if otherwise set. Default is ENT_NOQUOTES.
+ * @param string $charset        Optional. The character encoding of the string. Default is false.
+ * @param bool   $double_encode  Optional. Whether to encode existing html entities. Default is false.
  * @return string The encoded text with HTML entities.
  */
 function _wp_specialchars( $string, $quote_style = ENT_NOQUOTES, $charset = false, $double_encode = false ) {
@@ -1657,9 +1596,9 @@ function sanitize_html_class( $class, $fallback = '' ) {
 	//Limit to A-Z,a-z,0-9,_,-
 	$sanitized = preg_replace( '/[^A-Za-z0-9_-]/', '', $sanitized );
 
-	if ( '' == $sanitized && $fallback ) {
-		return sanitize_html_class( $fallback );
-	}
+	if ( '' == $sanitized )
+		$sanitized = $fallback;
+
 	/**
 	 * Filter a sanitized HTML class string.
 	 *
@@ -1900,15 +1839,12 @@ function force_balance_tags( $text ) {
  * it is simply a holder for the 'format_to_edit' filter.
  *
  * @since 0.71
- * @since 4.4.0 The `$richedit` parameter was renamed to `$rich_text` for clarity.
  *
- * @param string $content   The text about to be edited.
- * @param bool   $rich_text Optional. Whether `$content` should be considered rich text,
- *                          in which case it would not be passed through esc_textarea().
- *                          Default false.
+ * @param string $content  The text about to be edited.
+ * @param bool   $richedit Whether the $content should not pass through htmlspecialchars(). Default false (meaning it will be passed).
  * @return string The text after the filter (and possibly htmlspecialchars()) has been run.
  */
-function format_to_edit( $content, $rich_text = false ) {
+function format_to_edit( $content, $richedit = false ) {
 	/**
 	 * Filter the text to be formatted for editing.
 	 *
@@ -1917,7 +1853,7 @@ function format_to_edit( $content, $rich_text = false ) {
 	 * @param string $content The text, prior to formatting for editing.
 	 */
 	$content = apply_filters( 'format_to_edit', $content );
-	if ( ! $rich_text )
+	if ( ! $richedit )
 		$content = esc_textarea( $content );
 	return $content;
 }
@@ -2319,23 +2255,8 @@ function wp_rel_nofollow( $text ) {
  */
 function wp_rel_nofollow_callback( $matches ) {
 	$text = $matches[1];
-	$atts = shortcode_parse_atts( $matches[1] );
-	$rel = 'nofollow';
-	if ( ! empty( $atts['rel'] ) ) {
-		$parts = array_map( 'trim', explode( ' ', $atts['rel'] ) );
-		if ( false === array_search( 'nofollow', $parts ) ) {
-			$parts[] = 'nofollow';
-		}
-		$rel = implode( ' ', $parts );
-		unset( $atts['rel'] );
-
-		$html = '';
-		foreach ( $atts as $name => $value ) {
-			$html .= "{$name}=\"$value\" ";
-		}
-		$text = trim( $html );
-	}
-	return "<a $text rel=\"$rel\">";
+	$text = str_replace(array(' rel="nofollow"', " rel='nofollow'"), '', $text);
+	return "<a $text rel=\"nofollow\">";
 }
 
 /**
@@ -2464,6 +2385,7 @@ function is_email( $email, $deprecated = false ) {
 		 *
 		 * @param bool   $is_email Whether the email address has passed the is_email() checks. Default false.
 		 * @param string $email    The email address being checked.
+		 * @param string $message  An explanatory message to the user.
 		 * @param string $context  Context under which the email was tested.
 		 */
 		return apply_filters( 'is_email', false, $email, 'email_too_short' );
@@ -3350,19 +3272,11 @@ function esc_url( $url, $protocols = null, $_context = 'display' ) {
 
 	if ( '' == $url )
 		return $url;
-
-	$url = str_replace( ' ', '%20', $url );
 	$url = preg_replace('|[^a-z0-9-~+_.?#=!&;,/:%@$\|*\'()\\x80-\\xff]|i', '', $url);
-
-	if ( '' === $url ) {
-		return $url;
-	}
-
 	if ( 0 !== stripos( $url, 'mailto:' ) ) {
 		$strip = array('%0d', '%0a', '%0D', '%0A');
 		$url = _deep_replace($strip, $url);
 	}
-
 	$url = str_replace(';//', '://', $url);
 	/* If the URL doesn't appear to contain a scheme, we
 	 * presume it needs http:// appended (unless a relative
@@ -4071,7 +3985,7 @@ function _links_add_base( $m ) {
 	return $m[1] . '=' . $m[2] .
 		( preg_match( '#^(\w{1,20}):#', $m[3], $protocol ) && in_array( $protocol[1], wp_allowed_protocols() ) ?
 			$m[3] :
-			WP_Http::make_absolute_url( $m[3], $_links_add_base )
+			WP_HTTP::make_absolute_url( $m[3], $_links_add_base )
 		)
 		. $m[2];
 }
@@ -4526,7 +4440,7 @@ function wp_encode_emoji( $content ) {
 		$matches = array();
 		if ( preg_match_all( $regex, $content, $matches ) ) {
 			if ( ! empty( $matches[1] ) ) {
-				foreach ( $matches[1] as $emoji ) {
+				foreach( $matches[1] as $emoji ) {
 					/*
 					 * UTF-32's hex encoding is the same as HTML's hex encoding.
 					 * So, by converting the emoji from UTF-8 to UTF-32, we magically

@@ -24,10 +24,10 @@ get_current_screen()->add_help_tab( array(
 	'title'   => __('Overview'),
 	'content' =>
 		'<p>' . __('The menu is for editing information specific to individual sites, particularly if the admin area of a site is unavailable.') . '</p>' .
-		'<p>' . __('<strong>Info</strong> &mdash; The site URL is rarely edited as this can cause the site to not work properly. The Registered date and Last Updated date are displayed. Network admins can mark a site as archived, spam, deleted and mature, to remove from public listings or disable.') . '</p>' .
-		'<p>' . __('<strong>Users</strong> &mdash; This displays the users associated with this site. You can also change their role, reset their password, or remove them from the site. Removing the user from the site does not remove the user from the network.') . '</p>' .
-		'<p>' . sprintf( __('<strong>Themes</strong> &mdash; This area shows themes that are not already enabled across the network. Enabling a theme in this menu makes it accessible to this site. It does not activate the theme, but allows it to show in the site&#8217;s Appearance menu. To enable a theme for the entire network, see the <a href="%s">Network Themes</a> screen.' ), network_admin_url( 'themes.php' ) ) . '</p>' .
-		'<p>' . __('<strong>Settings</strong> &mdash; This page shows a list of all settings associated with this site. Some are created by WordPress and others are created by plugins you activate. Note that some fields are grayed out and say Serialized Data. You cannot modify these values due to the way the setting is stored in the database.') . '</p>'
+		'<p>' . __('<strong>Info</strong> - The domain and path are rarely edited as this can cause the site to not work properly. The Registered date and Last Updated date are displayed. Network admins can mark a site as archived, spam, deleted and mature, to remove from public listings or disable.') . '</p>' .
+		'<p>' . __('<strong>Users</strong> - This displays the users associated with this site. You can also change their role, reset their password, or remove them from the site. Removing the user from the site does not remove the user from the network.') . '</p>' .
+		'<p>' . sprintf( __('<strong>Themes</strong> - This area shows themes that are not already enabled across the network. Enabling a theme in this menu makes it accessible to this site. It does not activate the theme, but allows it to show in the site&#8217;s Appearance menu. To enable a theme for the entire network, see the <a href="%s">Network Themes</a> screen.' ), network_admin_url( 'themes.php' ) ) . '</p>' .
+		'<p>' . __('<strong>Settings</strong> - This page shows a list of all settings associated with this site. Some are created by WordPress and others are created by plugins you activate. Note that some fields are grayed out and say Serialized Data. You cannot modify these values due to the way the setting is stored in the database.') . '</p>'
 ) );
 
 get_current_screen()->set_help_sidebar(
@@ -77,16 +77,9 @@ if ( $action ) {
 				if ( false === $user_id ) {
 		 			$update = 'err_new_dup';
 				} else {
+					wp_new_user_notification( $user_id, null, 'both' );
 					add_user_to_blog( $id, $user_id, $_POST['new_role'] );
 					$update = 'newuser';
-					/**
-					  * Fires after a user has been created via the network site-users.php page.
-					  *
-					  * @since 4.4.0
-					  *
-					  * @param int $user_id ID of the newly created user.
-					  */
-					do_action( 'network_site_users_created_user', $user_id );
 				}
 			}
 			break;
@@ -143,13 +136,8 @@ if ( $action ) {
 					$user_id = (int) $user_id;
 
 					// If the user doesn't already belong to the blog, bail.
-					if ( ! is_user_member_of_blog( $user_id ) ) {
-						wp_die(
-							'<h1>' . __( 'Cheatin&#8217; uh?' ) . '</h1>' .
-							'<p>' . __( 'One of the selected users is not a member of this site.' ) . '</p>',
-							403
-						);
-					}
+					if ( !is_user_member_of_blog( $user_id ) )
+						wp_die( __( 'Cheatin&#8217; uh?' ), 403 );
 
 					$user = get_userdata( $user_id );
 					$user->set_role( $_REQUEST['new_role'] );
@@ -272,7 +260,7 @@ do_action( 'network_site_users_after_list_table' );
 
 /** This filter is documented in wp-admin/network/site-users.php */
 if ( current_user_can( 'promote_users' ) && apply_filters( 'show_network_site_users_add_existing_form', true ) ) : ?>
-<h2 id="add-existing-user"><?php _e( 'Add Existing User' ); ?></h2>
+<h3 id="add-existing-user"><?php _e( 'Add Existing User' ); ?></h3>
 <form action="site-users.php?action=adduser" id="adduser" method="post">
 	<input type="hidden" name="id" value="<?php echo esc_attr( $id ) ?>" />
 	<table class="form-table">
@@ -301,7 +289,7 @@ if ( current_user_can( 'promote_users' ) && apply_filters( 'show_network_site_us
  * @param bool $bool Whether to show the Add New User form. Default true.
  */
 if ( current_user_can( 'create_users' ) && apply_filters( 'show_network_site_users_add_new_form', true ) ) : ?>
-<h2 id="add-new-user"><?php _e( 'Add New User' ); ?></h2>
+<h3 id="add-new-user"><?php _e( 'Add New User' ); ?></h3>
 <form action="<?php echo network_admin_url('site-users.php?action=newuser'); ?>" id="newuser" method="post">
 	<input type="hidden" name="id" value="<?php echo esc_attr( $id ) ?>" />
 	<table class="form-table">

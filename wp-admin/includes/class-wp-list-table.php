@@ -283,13 +283,11 @@ class WP_List_Table {
 	 * @return int Number of items that correspond to the given pagination argument.
 	 */
 	public function get_pagination_arg( $key ) {
-		if ( 'page' === $key ) {
+		if ( 'page' == $key )
 			return $this->get_pagenum();
-		}
 
-		if ( isset( $this->_pagination_args[$key] ) ) {
+		if ( isset( $this->_pagination_args[$key] ) )
 			return $this->_pagination_args[$key];
-		}
 	}
 
 	/**
@@ -437,14 +435,14 @@ class WP_List_Table {
 		if ( empty( $this->_actions ) )
 			return;
 
-		echo '<label for="bulk-action-selector-' . esc_attr( $which ) . '" class="screen-reader-text">' . __( 'Select bulk action' ) . '</label>';
-		echo '<select name="action' . $two . '" id="bulk-action-selector-' . esc_attr( $which ) . "\">\n";
-		echo '<option value="-1">' . __( 'Bulk Actions' ) . "</option>\n";
+		echo "<label for='bulk-action-selector-" . esc_attr( $which ) . "' class='screen-reader-text'>" . __( 'Select bulk action' ) . "</label>";
+		echo "<select name='action$two' id='bulk-action-selector-" . esc_attr( $which ) . "'>\n";
+		echo "<option value='-1' selected='selected'>" . __( 'Bulk Actions' ) . "</option>\n";
 
 		foreach ( $this->_actions as $name => $title ) {
-			$class = 'edit' === $name ? ' class="hide-if-no-js"' : '';
+			$class = 'edit' == $name ? ' class="hide-if-no-js"' : '';
 
-			echo "\t" . '<option value="' . $name . '"' . $class . '>' . $title . "</option>\n";
+			echo "\t<option value='$name'$class>$title</option>\n";
 		}
 
 		echo "</select>\n";
@@ -530,18 +528,10 @@ class WP_List_Table {
 			return;
 		}
 
-		$extra_checks = "AND post_status != 'auto-draft'";
-		if ( ! isset( $_GET['post_status'] ) || 'trash' !== $_GET['post_status'] ) {
-			$extra_checks .= " AND post_status != 'trash'";
-		} elseif ( isset( $_GET['post_status'] ) ) {
-			$extra_checks = $wpdb->prepare( ' AND post_status = %s', $_GET['post_status'] );
-		}
-
 		$months = $wpdb->get_results( $wpdb->prepare( "
 			SELECT DISTINCT YEAR( post_date ) AS year, MONTH( post_date ) AS month
 			FROM $wpdb->posts
 			WHERE post_type = %s
-			$extra_checks
 			ORDER BY post_date DESC
 		", $post_type ) );
 
@@ -600,7 +590,7 @@ class WP_List_Table {
 <?php
 			foreach ( $this->modes as $mode => $title ) {
 				$classes = array( 'view-' . $mode );
-				if ( $current_mode === $mode )
+				if ( $current_mode == $mode )
 					$classes[] = 'current';
 				printf(
 					"<a href='%s' class='%s' id='view-switch-$mode'><span class='screen-reader-text'>%s</span></a>\n",
@@ -657,11 +647,6 @@ class WP_List_Table {
 				esc_url( add_query_arg( array( 'p' => $post_id, 'comment_status' => 'moderated' ), admin_url( 'edit-comments.php' ) ) ),
 				$pending_comments_number,
 				$pending_phrase
-			);
-		} else {
-			printf( '<span class="post-com-count post-com-count-pending post-com-count-no-pending"><span class="comment-count comment-count-no-pending" aria-hidden="true">%s</span><span class="screen-reader-text">%s</span></span>',
-				$pending_comments_number,
-				$approved_comments ? __( 'No pending comments' ) : __( 'No comments' )
 			);
 		}
 	}
@@ -784,7 +769,7 @@ class WP_List_Table {
 			);
 		}
 
-		if ( 'bottom' === $which ) {
+		if ( 'bottom' == $which ) {
 			$html_current_page  = $current;
 			$total_pages_before = '<span class="screen-reader-text">' . __( 'Current Page' ) . '</span><span id="table-paging" class="paging-input">';
 		} else {
@@ -878,7 +863,7 @@ class WP_List_Table {
 
 		// We need a primary defined so responsive views show something,
 		// so let's fall back to the first non-checkbox column.
-		foreach ( $columns as $col => $column_name ) {
+		foreach( $columns as $col => $column_name ) {
 			if ( 'cb' === $col ) {
 				continue;
 			}
@@ -888,18 +873,6 @@ class WP_List_Table {
 		}
 
 		return $column;
-	}
-
-	/**
-	 * Public wrapper for WP_List_Table::get_default_primary_column_name().
-	 *
-	 * @since 4.4.0
-	 * @access public
-	 *
-	 * @return string Name of the default primary column.
-	 */
-	public function get_primary_column() {
-		return $this->get_primary_column_name();
 	}
 
 	/**
@@ -1007,38 +980,6 @@ class WP_List_Table {
 	}
 
 	/**
-	 * If 'orderby' is set, return it.
-	 *
-	 * @access protected
-	 * @since 4.4.0
-	 *
-	 * @return string The value of 'orderby' or empty string.
-	 */
-	protected function get_orderby() {
-		if ( isset( $_GET['orderby'] ) ) {
-			return $_GET['orderby'];
-		}
-
-		return '';
-	}
-
-	/**
-	 * If 'order' is 'desc', return it. Else return 'asc'.
-	 *
-	 * @access protected
-	 * @since 4.4.0
-	 *
-	 * @return string 'desc' or 'asc'.
-	 */
-	protected function get_order() {
-		if ( isset( $_GET['order'] ) && 'desc' === $_GET['order'] ) {
-			return 'desc';
-		}
-
-		return 'asc';
-	}
-
-	/**
 	 * Print column headers, accounting for hidden and sortable columns.
 	 *
 	 * @since 3.1.0
@@ -1054,8 +995,15 @@ class WP_List_Table {
 		$current_url = set_url_scheme( 'http://' . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'] );
 		$current_url = remove_query_arg( 'paged', $current_url );
 
-		$current_orderby = $this->get_orderby();
-		$current_order = $this->get_order();
+		if ( isset( $_GET['orderby'] ) )
+			$current_orderby = $_GET['orderby'];
+		else
+			$current_orderby = '';
+
+		if ( isset( $_GET['order'] ) && 'desc' == $_GET['order'] )
+			$current_order = 'desc';
+		else
+			$current_order = 'asc';
 
 		if ( ! empty( $columns['cb'] ) ) {
 			static $cb_counter = 1;
@@ -1071,7 +1019,7 @@ class WP_List_Table {
 				$class[] = 'hidden';
 			}
 
-			if ( 'cb' === $column_key )
+			if ( 'cb' == $column_key )
 				$class[] = 'check-column';
 			elseif ( in_array( $column_key, array( 'posts', 'comments', 'links' ) ) )
 				$class[] = 'num';
@@ -1083,8 +1031,8 @@ class WP_List_Table {
 			if ( isset( $sortable[$column_key] ) ) {
 				list( $orderby, $desc_first ) = $sortable[$column_key];
 
-				if ( $current_orderby === $orderby ) {
-					$order = 'asc' === $current_order ? 'desc' : 'asc';
+				if ( $current_orderby == $orderby ) {
+					$order = 'asc' == $current_order ? 'desc' : 'asc';
 					$class[] = 'sorted';
 					$class[] = $current_order;
 				} else {
@@ -1163,17 +1111,15 @@ class WP_List_Table {
 	 * @param string $which
 	 */
 	protected function display_tablenav( $which ) {
-		if ( 'top' === $which ) {
+		if ( 'top' == $which )
 			wp_nonce_field( 'bulk-' . $this->_args['plural'] );
-		}
-		?>
+?>
 	<div class="tablenav <?php echo esc_attr( $which ); ?>">
 
-		<?php if ( $this->has_items() ): ?>
 		<div class="alignleft actions bulkactions">
 			<?php $this->bulk_actions( $which ); ?>
 		</div>
-		<?php endif;
+<?php
 		$this->extra_tablenav( $which );
 		$this->pagination( $which );
 ?>
@@ -1274,7 +1220,7 @@ class WP_List_Table {
 
 			$attributes = "class='$classes' $data";
 
-			if ( 'cb' === $column_name ) {
+			if ( 'cb' == $column_name ) {
 				echo '<th scope="row" class="check-column">';
 				echo $this->column_cb( $item );
 				echo '</th>';
@@ -1309,10 +1255,10 @@ class WP_List_Table {
 	 * @param object $item        The item being acted upon.
 	 * @param string $column_name Current column name.
 	 * @param string $primary     Primary column name.
-	 * @return string The row actions HTML, or an empty string if the current column is the primary column.
+	 * @return string The row actions output. In this case, an empty string.
 	 */
 	protected function handle_row_actions( $item, $column_name, $primary ) {
-		return $column_name === $primary ? '<button type="button" class="toggle-row"><span class="screen-reader-text">' . __( 'Show more details' ) . '</span></button>' : '';
+		return $column_name == $primary ? '<button type="button" class="toggle-row"><span class="screen-reader-text">' . __( 'Show more details' ) . '</span></button>' : '';
  	}
 
 	/**

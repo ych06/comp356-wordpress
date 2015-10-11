@@ -233,7 +233,6 @@ if ( isset( $_GET['replytocom'] ) )
 
 // Login actions
 add_action( 'login_head',          'wp_print_head_scripts',         9     );
-add_action( 'login_head',          'wp_site_icon',                  99    );
 add_action( 'login_footer',        'wp_print_footer_scripts',       20    );
 add_action( 'login_init',          'send_frame_options_header',     10, 0 );
 
@@ -292,9 +291,8 @@ add_action( 'begin_fetch_post_thumbnail_html', '_wp_post_thumbnail_class_filter_
 add_action( 'end_fetch_post_thumbnail_html',   '_wp_post_thumbnail_class_filter_remove' );
 
 // Redirect Old Slugs
-add_action( 'template_redirect',  'wp_old_slug_redirect'              );
-add_action( 'post_updated',       'wp_check_for_changed_slugs', 12, 3 );
-add_action( 'attachment_updated', 'wp_check_for_changed_slugs', 12, 3 );
+add_action( 'template_redirect', 'wp_old_slug_redirect'              );
+add_action( 'post_updated',      'wp_check_for_changed_slugs', 12, 3 );
 
 // Nonce check for Post Previews
 add_action( 'init', '_show_post_preview' );
@@ -314,9 +312,6 @@ add_filter( 'default_option_link_manager_enabled', '__return_true' );
 
 // This option no longer exists; tell plugins we always support auto-embedding.
 add_filter( 'default_option_embed_autourls', '__return_true' );
-
-// This option no longer exists; tell plugins we want comment pagination.
-add_filter( 'pre_option_page_comments', '__return_true' );
 
 // Default settings for heartbeat
 add_filter( 'heartbeat_settings', 'wp_heartbeat_settings' );
@@ -338,13 +333,6 @@ add_action( 'split_shared_term', '_wp_check_split_default_terms',  10, 4 );
 add_action( 'split_shared_term', '_wp_check_split_terms_in_menus', 10, 4 );
 add_action( 'split_shared_term', '_wp_check_split_nav_menu_terms', 10, 4 );
 add_action( 'wp_split_shared_term_batch', '_wp_batch_split_terms' );
-
-// Email notifications.
-add_action( 'comment_post', 'wp_new_comment_notify_moderator' );
-add_action( 'comment_post', 'wp_new_comment_notify_postauthor' );
-add_action( 'after_password_reset', 'wp_password_change_notification' );
-add_action( 'register_new_user',      'wp_send_new_user_notifications' );
-add_action( 'edit_user_created_user', 'wp_send_new_user_notifications' );
 
 /**
  * Filters formerly mixed into wp-includes

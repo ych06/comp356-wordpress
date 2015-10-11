@@ -106,24 +106,21 @@ function the_media_upload_tabs() {
  *
  * @since 2.5.0
  *
- * @param int     $id      image attachment id
- * @param string  $caption image caption
- * @param string  $title   image title attribute
- * @param string  $align   image css alignment property
- * @param string  $url     image src url
- * @param string  $rel     image rel attribute
- * @param string  $size    image size (thumbnail, medium, large, full or added  with add_image_size() )
+ * @param integer $id image attachment id
+ * @param string $caption image caption
+ * @param string $alt image alt attribute
+ * @param string $title image title attribute
+ * @param string $align image css alignment property
+ * @param string $url image src url
+ * @param string|bool $rel image rel attribute
+ * @param string $size image size (thumbnail, medium, large, full or added  with add_image_size() )
  * @return string the html to insert into editor
  */
-function get_image_send_to_editor( $id, $caption, $title, $align, $url='', $rel = '', $size='medium', $alt = '' ) {
+function get_image_send_to_editor($id, $caption, $title, $align, $url='', $rel = false, $size='medium', $alt = '') {
 
 	$html = get_image_tag($id, $alt, '', $align, $size);
 
-	if ( ! $rel ) {
-		$rel = ' rel="attachment wp-att-' . esc_attr( $id ) . '"';
-	} else {
-		$rel = ' rel="' . esc_attr( $rel ) . '"';
-	}
+	$rel = $rel ? ' rel="attachment wp-att-' . esc_attr($id).'"' : '';
 
 	if ( $url )
 		$html = '<a href="' . esc_attr($url) . "\"$rel>$html</a>";
@@ -727,7 +724,7 @@ function media_upload_form_handler() {
 }
 
 /**
- * Handles the process of uploading media.
+ * {@internal Missing Short Description}}
  *
  * @since 2.5.0
  *
@@ -808,9 +805,7 @@ function wp_media_upload_handler() {
 
 	if ( isset( $_POST['save'] ) ) {
 		$errors['upload_notice'] = __('Saved.');
-		wp_enqueue_script( 'admin-gallery' );
- 		return wp_iframe( 'media_upload_gallery_form', $errors );
-
+		return media_upload_gallery();
 	} elseif ( ! empty( $_POST ) ) {
 		$return = media_upload_form_handler();
 
@@ -1244,7 +1239,7 @@ function get_attachment_fields_to_edit($post, $errors = null) {
 	}
 
 	// Merge default fields with their errors, so any key passed with the error (e.g. 'error', 'helps', 'value') will replace the default
-	// The recursive merge is easily traversed with array casting: foreach ( (array) $things as $thing )
+	// The recursive merge is easily traversed with array casting: foreach( (array) $things as $thing )
 	$form_fields = array_merge_recursive($form_fields, (array) $errors);
 
 	// This was formerly in image_attachment_fields_to_edit().
@@ -1371,8 +1366,7 @@ function get_media_item( $attachment_id, $args = null ) {
 	$toggle_on  = __( 'Show' );
 	$toggle_off = __( 'Hide' );
 
-	$file = get_attached_file( $post->ID );
-	$filename = esc_html( wp_basename( $file ) );
+	$filename = esc_html( wp_basename( $post->guid ) );
 	$title = esc_attr( $post->post_title );
 
 	$post_mime_types = get_post_mime_types();
@@ -1633,7 +1627,7 @@ function get_compat_media_markup( $attachment_id, $args = null ) {
 	}
 
 	// Merge default fields with their errors, so any key passed with the error (e.g. 'error', 'helps', 'value') will replace the default
-	// The recursive merge is easily traversed with array casting: foreach ( (array) $things as $thing )
+	// The recursive merge is easily traversed with array casting: foreach( (array) $things as $thing )
 	$form_fields = array_merge_recursive($form_fields, (array) $args['errors'] );
 
 	/** This filter is documented in wp-admin/includes/media.php */
@@ -2790,8 +2784,7 @@ function edit_form_image_editor( $post ) {
 function attachment_submitbox_metadata() {
 	$post = get_post();
 
-	$file = get_attached_file( $post->ID );
-	$filename = esc_html( wp_basename( $file ) );
+	$filename = esc_html( wp_basename( $post->guid ) );
 
 	$media_dims = '';
 	$meta = wp_get_attachment_metadata( $post->ID );
@@ -2826,6 +2819,7 @@ function attachment_submitbox_metadata() {
 	</div>
 
 	<?php
+		$file  = get_attached_file( $post->ID );
 		$file_size = false;
 
 		if ( isset( $meta['filesize'] ) )
@@ -2974,7 +2968,7 @@ function wp_read_video_metadata( $file ) {
 
 	$metadata = array();
 
-	if ( ! class_exists( 'getID3', false ) )
+	if ( ! class_exists( 'getID3' ) )
 		require( ABSPATH . WPINC . '/ID3/getid3.php' );
 	$id3 = new getID3();
 	$data = $id3->analyze( $file );
@@ -3029,7 +3023,7 @@ function wp_read_audio_metadata( $file ) {
 		return false;
 	$metadata = array();
 
-	if ( ! class_exists( 'getID3', false ) )
+	if ( ! class_exists( 'getID3' ) )
 		require( ABSPATH . WPINC . '/ID3/getid3.php' );
 	$id3 = new getID3();
 	$data = $id3->analyze( $file );

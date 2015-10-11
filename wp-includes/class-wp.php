@@ -15,7 +15,7 @@ class WP {
 	 * @access public
 	 * @var array
 	 */
-	public $public_query_vars = array('m', 'p', 'posts', 'w', 'cat', 'withcomments', 'withoutcomments', 's', 'search', 'exact', 'sentence', 'calendar', 'page', 'paged', 'more', 'tb', 'pb', 'author', 'order', 'orderby', 'year', 'monthnum', 'day', 'hour', 'minute', 'second', 'name', 'category_name', 'tag', 'feed', 'author_name', 'static', 'pagename', 'page_id', 'error', 'comments_popup', 'attachment', 'attachment_id', 'subpost', 'subpost_id', 'preview', 'robots', 'taxonomy', 'term', 'cpage', 'post_type', 'title');
+	public $public_query_vars = array('m', 'p', 'posts', 'w', 'cat', 'withcomments', 'withoutcomments', 's', 'search', 'exact', 'sentence', 'calendar', 'page', 'paged', 'more', 'tb', 'pb', 'author', 'order', 'orderby', 'year', 'monthnum', 'day', 'hour', 'minute', 'second', 'name', 'category_name', 'tag', 'feed', 'author_name', 'static', 'pagename', 'page_id', 'error', 'comments_popup', 'attachment', 'attachment_id', 'subpost', 'subpost_id', 'preview', 'robots', 'taxonomy', 'term', 'cpage', 'post_type');
 
 	/**
 	 * Private query variables.
@@ -261,11 +261,9 @@ class WP {
 		 */
 		$this->public_query_vars = apply_filters( 'query_vars', $this->public_query_vars );
 
-		foreach ( get_post_types( array(), 'objects' ) as $post_type => $t ) {
-			if ( is_post_type_viewable( $t ) && $t->query_var ) {
+		foreach ( get_post_types( array(), 'objects' ) as $post_type => $t )
+			if ( $t->query_var )
 				$post_type_query_vars[$t->query_var] = $post_type;
-			}
-		}
 
 		foreach ( $this->public_query_vars as $wpvar ) {
 			if ( isset( $this->extra_query_vars[$wpvar] ) )
@@ -299,21 +297,6 @@ class WP {
 		foreach ( get_taxonomies( array() , 'objects' ) as $taxonomy => $t )
 			if ( $t->query_var && isset( $this->query_vars[$t->query_var] ) )
 				$this->query_vars[$t->query_var] = str_replace( ' ', '+', $this->query_vars[$t->query_var] );
-
-		// Don't allow non-public taxonomies to be queried from the front-end.
-		if ( ! is_admin() ) {
-			foreach ( get_taxonomies( array( 'public' => false ), 'objects' ) as $taxonomy => $t ) {
-				// Check first for taxonomy-specific query_var.
-				if ( $t->query_var && isset( $this->query_vars[ $t->query_var ] ) ) {
-					unset( $this->query_vars[ $t->query_var ] );
-				}
-
-				// Next, check the 'taxonomy' query_var.
-				if ( isset( $this->query_vars['taxonomy'] ) && $taxonomy === $this->query_vars['taxonomy'] ) {
-					unset( $this->query_vars['taxonomy'], $this->query_vars['term'] );
-				}
-			}
-		}
 
 		// Limit publicly queried post_types to those that are publicly_queryable
 		if ( isset( $this->query_vars['post_type']) ) {
@@ -357,16 +340,15 @@ class WP {
 	}
 
 	/**
-	 * Sends additional HTTP headers for caching, content type, etc.
+	 * Send additional HTTP headers for caching, content type, etc.
 	 *
-	 * Sets the Content-Type header. Sets the 'error' status (if passed) and optionally exits.
-	 * If showing a feed, it will also send Last-Modified, ETag, and 304 status if needed.
+	 * Sets the X-Pingback header, 404 status (if 404), Content-type. If showing
+	 * a feed, it will also send last-modified, etag, and 304 status if needed.
 	 *
 	 * @since 2.0.0
-	 * @since 4.4.0 `X-Pingback` header is added conditionally after posts have been queried in handle_404().
 	 */
 	public function send_headers() {
-		$headers = array();
+		$headers = array('X-Pingback' => get_bloginfo('pingback_url'));
 		$status = null;
 		$exit_required = false;
 
@@ -384,13 +366,6 @@ class WP {
 		} elseif ( empty( $this->query_vars['feed'] ) ) {
 			$headers['Content-Type'] = get_option('html_type') . '; charset=' . get_option('blog_charset');
 		} else {
-			// Set the correct content type for feeds
-			$type = $this->query_vars['feed'];
-			if ( 'feed' == $this->query_vars['feed'] ) {
-				$type = get_default_feed();
-			}
-			$headers['Content-Type'] = feed_content_type( $type ) . '; charset=' . get_option( 'blog_charset' );
-
 			// We're showing a feed, so WP is indeed the only thing that last changed
 			if ( !empty($this->query_vars['withcomments'])
 				|| false !== strpos( $this->query_vars['feed'], 'comments-' )
@@ -463,7 +438,7 @@ class WP {
 			}
 		}
 
-		foreach ( (array) $headers as $name => $field_value )
+		foreach( (array) $headers as $name => $field_value )
 			@header("{$name}: {$field_value}");
 
 		if ( $exit_required )
@@ -583,10 +558,6 @@ class WP {
 	 *
 	 * Otherwise, issue a 200.
 	 *
-	 * This sets headers after posts have been queried. handle_404() really means "handle status."
-	 * By inspecting the result of querying posts, seemingly successful requests can be switched to
-	 * a 404 so that canonical redirection logic can kick in.
-	 *
 	 * @since 2.0.0
 	 *
 	 * @global WP_Query $wp_query
@@ -600,27 +571,8 @@ class WP {
 
 		// Never 404 for the admin, robots, or if we found posts.
 		if ( is_admin() || is_robots() || $wp_query->posts ) {
-
-			$success = true;
-			if ( is_singular() ) {
-				$p = clone $wp_query->post;
-				// Only set X-Pingback for single posts that allow pings.
-				if ( $p && pings_open( $p ) ) {
-					@header( 'X-Pingback: ' . get_bloginfo( 'pingback_url' ) );
-				}
-
-				// check for paged content that exceeds the max number of pages
-				$next = '<!--nextpage-->';
-				if ( $p && false !== strpos( $p->post_content, $next ) && ! empty( $this->query_vars['page'] ) ) {
-					$page = trim( $this->query_vars['page'], '/' );
-					$success = (int) $page <= ( substr_count( $p->post_content, $next ) + 1 );
-				}
-			}
-
-			if ( $success ) {
-				status_header( 200 );
-				return;
-			}
+			status_header( 200 );
+			return;
 		}
 
 		// We will 404 for paged queries, as no posts were found.

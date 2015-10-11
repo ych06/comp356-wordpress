@@ -77,9 +77,8 @@ class WP_Plugin_Install_List_Table extends WP_List_Table {
 		// These are the tabs which are shown on the page
 		$tabs = array();
 
-		if ( 'search' === $tab ) {
+		if ( 'search' == $tab )
 			$tabs['search']	= __( 'Search Results' );
-		}
 		$tabs['featured']  = _x( 'Featured', 'Plugin Installer' );
 		$tabs['popular']   = _x( 'Popular', 'Plugin Installer' );
 		$tabs['recommended']   = _x( 'Recommended', 'Plugin Installer' );
@@ -239,7 +238,7 @@ class WP_Plugin_Install_List_Table extends WP_List_Table {
 
 		$display_tabs = array();
 		foreach ( (array) $tabs as $action => $text ) {
-			$class = ( $action === $tab ) ? ' current' : '';
+			$class = ( $action == $tab ) ? ' current' : '';
 			$href = self_admin_url('plugin-install.php?tab=' . $action);
 			$display_tabs['plugin-install-'.$action] = "<a href='$href' class='$class'>$text</a>";
 		}
@@ -311,7 +310,7 @@ class WP_Plugin_Install_List_Table extends WP_List_Table {
 			return;
 		}
 
-		if ( 'top' === $which ) {
+		if ( 'top' ==  $which ) {
 			wp_referer_field();
 		?>
 			<div class="tablenav top">
@@ -368,7 +367,7 @@ class WP_Plugin_Install_List_Table extends WP_List_Table {
 			return 0;
 		}
 
-		if ( 'DESC' === $this->order ) {
+		if ( 'DESC' == $this->order ) {
 			return ( $a < $b ) ? 1 : -1;
 		} else {
 			return ( $a < $b ) ? -1 : 1;
@@ -492,13 +491,9 @@ class WP_Plugin_Install_List_Table extends WP_List_Table {
 		?>
 		<div class="plugin-card plugin-card-<?php echo sanitize_html_class( $plugin['slug'] ); ?>">
 			<div class="plugin-card-top">
+				<a href="<?php echo esc_url( $details_link ); ?>" class="thickbox plugin-icon"><img src="<?php echo esc_attr( $plugin_icon_url ) ?>" /></a>
 				<div class="name column-name">
-					<h4>
-						<a href="<?php echo esc_url( $details_link ); ?>" class="thickbox">
-						<?php echo $title; ?>
-						<img src="<?php echo esc_attr( $plugin_icon_url ) ?>" class="plugin-icon" alt="">
-						</a>
-					</h4>
+					<h4><a href="<?php echo esc_url( $details_link ); ?>" class="thickbox"><?php echo $title; ?></a></h4>
 				</div>
 				<div class="action-links">
 					<?php

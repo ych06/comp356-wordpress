@@ -17,8 +17,8 @@ $wp_file_descriptions = array(
 	'rtl.css' => __( 'RTL Stylesheet' ),
 	'comments.php' => __( 'Comments' ),
 	'comments-popup.php' => __( 'Popup Comments' ),
-	'footer.php' => __( 'Theme Footer' ),
-	'header.php' => __( 'Theme Header' ),
+	'footer.php' => __( 'Footer' ),
+	'header.php' => __( 'Header' ),
 	'sidebar.php' => __( 'Sidebar' ),
 	'archive.php' => __( 'Archives' ),
 	'author.php' => __( 'Author Template' ),
@@ -36,6 +36,7 @@ $wp_file_descriptions = array(
 	'video.php' => __('Video Attachment Template'),
 	'audio.php' => __('Audio Attachment Template'),
 	'application.php' => __('Application Attachment Template'),
+	'my-hacks.php' => __( 'my-hacks.php (legacy hacks support)' ),
 	'.htaccess' => __( '.htaccess (for rewrite rules )' ),
 	// Deprecated files
 	'wp-layout.css' => __( 'Stylesheet' ),
@@ -51,21 +52,18 @@ $wp_file_descriptions = array(
  *
  * @global array $wp_file_descriptions
  * @param string $file Filesystem path or filename
- * @return string Description of file from $wp_file_descriptions or basename of $file if description doesn't exist.
- *                Appends 'Page Template' to basename of $file if the file is a page template
+ * @return string Description of file from $wp_file_descriptions or basename of $file if description doesn't exist
  */
 function get_file_description( $file ) {
-	global $wp_file_descriptions, $allowed_files;
+	global $wp_file_descriptions;
 
-	$relative_pathinfo = pathinfo( $file );
-	$file_path = $allowed_files[ $file ];
-	if ( isset( $wp_file_descriptions[ basename( $file ) ] ) && '.' === $relative_pathinfo['dirname'] ) {
-		return $wp_file_descriptions[ basename( $file ) ];
-	} elseif ( file_exists( $file_path ) && is_file( $file_path ) ) {
-		$template_data = implode( '', file( $file_path ) );
-		if ( preg_match( '|Template Name:(.*)$|mi', $template_data, $name ) ) {
-			return sprintf( __( '%s Page Template' ), _cleanup_header_comment( $name[1] ) );
-		}
+	if ( isset( $wp_file_descriptions[basename( $file )] ) ) {
+		return $wp_file_descriptions[basename( $file )];
+	}
+	elseif ( file_exists( $file ) && is_file( $file ) ) {
+		$template_data = implode( '', file( $file ) );
+		if ( preg_match( '|Template Name:(.*)$|mi', $template_data, $name ))
+			return sprintf( __( '%s Page Template' ), _cleanup_header_comment($name[1]) );
 	}
 
 	return trim( basename( $file ) );
@@ -156,7 +154,7 @@ function wp_tempnam( $filename = '', $dir = '' ) {
 	$temp_filename = basename( $filename );
 	$temp_filename = preg_replace( '|\.[^.]*$|', '', $temp_filename );
 
-	// If the folder is falsey, use its parent directory name instead.
+	// If the folder is falsey, use it's parent directory name instead
 	if ( ! $temp_filename ) {
 		return wp_tempnam( dirname( $filename ), $dir );
 	}
@@ -562,7 +560,7 @@ function unzip_file($file, $to) {
 	 *
 	 * @param bool $ziparchive Whether to use ZipArchive. Default true.
 	 */
-	if ( class_exists( 'ZipArchive', false ) && apply_filters( 'unzip_file_use_ziparchive', true ) ) {
+	if ( class_exists( 'ZipArchive' ) && apply_filters( 'unzip_file_use_ziparchive', true ) ) {
 		$result = _unzip_file_ziparchive($file, $to, $needed_dirs);
 		if ( true === $result ) {
 			return $result;
@@ -851,7 +849,7 @@ function WP_Filesystem( $args = false, $context = false, $allow_relaxed_file_own
 	if ( ! $method )
 		return false;
 
-	if ( ! class_exists( "WP_Filesystem_$method", false  ) ) {
+	if ( ! class_exists("WP_Filesystem_$method") ) {
 
 		/**
 		 * Filter the path for a specific filesystem method class file.
@@ -912,7 +910,7 @@ function WP_Filesystem( $args = false, $context = false, $allow_relaxed_file_own
  *
  * @since 2.5.0
  *
- * @global callable $_wp_filesystem_direct_method
+ * @global callback $_wp_filesystem_direct_method
  *
  * @param array  $args                         Optional. Connection details. Default empty array.
  * @param string $context                      Optional. Full path to the directory that is tested
@@ -1234,7 +1232,7 @@ function wp_print_request_filesystem_credentials_modal() {
 		<div class="notification-dialog" role="dialog" aria-labelledby="request-filesystem-credentials-title" tabindex="0">
 			<div class="request-filesystem-credentials-dialog-content">
 				<?php request_filesystem_credentials( site_url() ); ?>
-			</div>
+			<div>
 		</div>
 	</div>
 	<?php

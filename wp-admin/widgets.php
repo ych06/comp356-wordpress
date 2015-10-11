@@ -1,6 +1,6 @@
 <?php
 /**
- * Widget administration panel
+ * Widgets administration panel.
  *
  * @package WordPress
  * @subpackage Administration
@@ -12,18 +12,22 @@ require_once( dirname( __FILE__ ) . '/admin.php' );
 /** WordPress Administration Widgets API */
 require_once(ABSPATH . 'wp-admin/includes/widgets.php');
 
-if ( ! current_user_can( 'edit_theme_options' ) ) {
-	wp_die(
-		'<h1>' . __( 'Cheatin&#8217; uh?' ) . '</h1>' .
-		'<p>' . __( 'You are not allowed to edit theme options on this site.' ) . '</p>',
-		403
-	);
-}
+if ( ! current_user_can('edit_theme_options') )
+	wp_die( __( 'Cheatin&#8217; uh?' ), 403 );
 
 $widgets_access = get_user_setting( 'widgets_access' );
 if ( isset($_GET['widgets-access']) ) {
 	$widgets_access = 'on' == $_GET['widgets-access'] ? 'on' : 'off';
 	set_user_setting( 'widgets_access', $widgets_access );
+}
+
+/**
+ *
+ * @param string $classes
+ * @return string
+ */
+function wp_widgets_access_body_class($classes) {
+	return "$classes widgets_access ";
 }
 
 if ( 'on' == $widgets_access ) {
@@ -152,17 +156,6 @@ if ( isset($_POST['savewidget']) || isset($_POST['removewidget']) ) {
 
 		$sidebar = array_diff( $sidebar, array($widget_id) );
 		$_POST = array('sidebar' => $sidebar_id, 'widget-' . $id_base => array(), 'the-widget-id' => $widget_id, 'delete_widget' => '1');
-
-		/**
-		 * Fires immediately after a widget has been marked for deletion.
-		 * 
-		 * @since 4.4.0
-		 *
-		 * @param string $widget_id  ID of the widget marked for deletion.
-		 * @param string $sidebar_id ID of the sidebar the widget was deleted from.
-		 * @param string $id_base    ID base for the widget.
-		 */
-		do_action( 'delete_widget', $widget_id, $sidebar_id, $id_base );
 	}
 
 	$_POST['widget-id'] = $sidebar;

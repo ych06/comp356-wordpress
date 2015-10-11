@@ -386,7 +386,7 @@ class WP_Customize_Control {
 	 * @access public
 	 */
 	public function input_attrs() {
-		foreach ( $this->input_attrs as $attr => $value ) {
+		foreach( $this->input_attrs as $attr => $value ) {
 			echo $attr . '="' . esc_attr( $value ) . '" ';
 		}
 	}
@@ -1299,18 +1299,16 @@ class WP_Customize_Header_Image_Control extends WP_Customize_Image_Control {
 				?>
 			</p>
 			<div class="current">
-				<label for="header_image-button">
-					<span class="customize-control-title">
-						<?php _e( 'Current header' ); ?>
-					</span>
-				</label>
+				<span class="customize-control-title">
+					<?php _e( 'Current header' ); ?>
+				</span>
 				<div class="container">
-				</div>				
+				</div>
 			</div>
 			<div class="actions">
 				<?php if ( current_user_can( 'upload_files' ) ): ?>
 				<button type="button"<?php echo $visibility; ?> class="button remove" aria-label="<?php esc_attr_e( 'Hide header image' ); ?>"><?php _e( 'Hide image' ); ?></button>
-				<button type="button" class="button new" id="header_image-button"  aria-label="<?php esc_attr_e( 'Add new header image' ); ?>"><?php _e( 'Add new image' ); ?></button>
+				<button type="button" class="button new" aria-label="<?php esc_attr_e( 'Add new header image' ); ?>"><?php _e( 'Add new image' ); ?></button>
 				<div style="clear:both"></div>
 				<?php endif; ?>
 			</div>
@@ -1489,21 +1487,20 @@ class WP_Widget_Form_Customize_Control extends WP_Customize_Control {
 	public $height;
 	public $is_wide = false;
 
-	/**
-	 * Gather control params for exporting to JavaScript.
-	 *
-	 * @global array $wp_registered_widgets
-	 */
 	public function to_json() {
-		global $wp_registered_widgets;
-
 		parent::to_json();
 		$exported_properties = array( 'widget_id', 'widget_id_base', 'sidebar_id', 'width', 'height', 'is_wide' );
 		foreach ( $exported_properties as $key ) {
 			$this->json[ $key ] = $this->$key;
 		}
+	}
 
-		// Get the widget_control and widget_content.
+	/**
+	 *
+	 * @global array $wp_registered_widgets
+	 */
+	public function render_content() {
+		global $wp_registered_widgets;
 		require_once ABSPATH . '/wp-admin/includes/widgets.php';
 
 		$widget = $wp_registered_widgets[ $this->widget_id ];
@@ -1517,16 +1514,8 @@ class WP_Widget_Form_Customize_Control extends WP_Customize_Control {
 		);
 
 		$args = wp_list_widget_controls_dynamic_sidebar( array( 0 => $args, 1 => $widget['params'][0] ) );
-		$widget_control_parts = $this->manager->widgets->get_widget_control_parts( $args );
-
-		$this->json['widget_control'] = $widget_control_parts['control'];
-		$this->json['widget_content'] = $widget_control_parts['content'];
+		echo $this->manager->widgets->get_widget_control( $args );
 	}
-
-	/**
-	 * Override render_content to be no-op since content is exported via to_json for deferred embedding.
-	 */
-	public function render_content() {}
 
 	/**
 	 * Whether the current widget is rendered on the page.

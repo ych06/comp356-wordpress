@@ -29,7 +29,7 @@ function get_preferred_from_update_core() {
  */
 function get_core_updates( $options = array() ) {
 	$options = array_merge( array( 'available' => true, 'dismissed' => false ), $options );
-	$dismissed = get_network_option( 'dismissed_update_core' );
+	$dismissed = get_site_option( 'dismissed_update_core' );
 
 	if ( ! is_array( $dismissed ) )
 		$dismissed = array();
@@ -134,9 +134,9 @@ function get_core_checksums( $version, $locale ) {
  * @return bool
  */
 function dismiss_core_update( $update ) {
-	$dismissed = get_network_option( 'dismissed_update_core' );
+	$dismissed = get_site_option( 'dismissed_update_core' );
 	$dismissed[ $update->current . '|' . $update->locale ] = true;
-	return update_network_option( 'dismissed_update_core', $dismissed );
+	return update_site_option( 'dismissed_update_core', $dismissed );
 }
 
 /**
@@ -146,14 +146,14 @@ function dismiss_core_update( $update ) {
  * @return bool
  */
 function undismiss_core_update( $version, $locale ) {
-	$dismissed = get_network_option( 'dismissed_update_core' );
+	$dismissed = get_site_option( 'dismissed_update_core' );
 	$key = $version . '|' . $locale;
 
 	if ( ! isset( $dismissed[$key] ) )
 		return false;
 
 	unset( $dismissed[$key] );
-	return update_network_option( 'dismissed_update_core', $dismissed );
+	return update_site_option( 'dismissed_update_core', $dismissed );
 }
 
 /**
@@ -203,7 +203,7 @@ function core_update_footer( $msg = '' ) {
 		return sprintf( __( 'You are using a development version (%1$s). Cool! Please <a href="%2$s">stay updated</a>.' ), get_bloginfo( 'version', 'display' ), network_admin_url( 'update-core.php' ) );
 
 	case 'upgrade' :
-		return '<strong><a href="' . network_admin_url( 'update-core.php' ) . '">' . sprintf( __( 'Get Version %s' ), $cur->current ) . '</a></strong>';
+		return sprintf( '<strong>'.__( '<a href="%1$s">Get Version %2$s</a>' ).'</strong>', network_admin_url( 'update-core.php' ), $cur->current);
 
 	case 'latest' :
 	default :
@@ -254,21 +254,7 @@ function update_right_now_message() {
 			$msg .= '<a href="' . network_admin_url( 'update-core.php' ) . '" class="button" aria-describedby="wp-version">' . sprintf( __( 'Update to %s' ), $cur->current ? $cur->current : __( 'Latest' ) ) . '</a> ';
 	}
 
-	/* translators: 1: version number, 2: theme name */
-	$content = __( 'WordPress %1$s running %2$s theme.' );
-
-	/**
-	 * Filter the text displayed in the 'At a Glance' dashboard widget.
-	 *
-	 * Prior to 3.8.0, the widget was named 'Right Now'.
-	 *
-	 * @since 4.4.0
-	 *
-	 * @param string $content Default text.
-	 */
-	$content = apply_filters( 'update_right_now_text', $content );
-
-	$msg .= sprintf( '<span id="wp-version">' . $content . '</span>', get_bloginfo( 'version', 'display' ), $theme_name );
+	$msg .= sprintf( '<span id="wp-version">' . __( 'WordPress %1$s running %2$s theme.' ) . '</span>', get_bloginfo( 'version', 'display' ), $theme_name );
 
 	echo "<p id='wp-version-message'>$msg</p>";
 }
@@ -302,7 +288,7 @@ function wp_plugin_update_rows() {
 	$plugins = get_site_transient( 'update_plugins' );
 	if ( isset($plugins->response) && is_array($plugins->response) ) {
 		$plugins = array_keys( $plugins->response );
-		foreach ( $plugins as $plugin_file ) {
+		foreach( $plugins as $plugin_file ) {
 			add_action( "after_plugin_row_$plugin_file", 'wp_plugin_update_row', 10, 2 );
 		}
 	}
@@ -415,7 +401,7 @@ function wp_theme_update_rows() {
 	if ( isset($themes->response) && is_array($themes->response) ) {
 		$themes = array_keys( $themes->response );
 
-		foreach ( $themes as $theme ) {
+		foreach( $themes as $theme ) {
 			add_action( "after_theme_row_$theme", 'wp_theme_update_row', 10, 2 );
 		}
 	}
@@ -478,7 +464,7 @@ function maintenance_nag() {
 	global $upgrading;
 	$nag = isset( $upgrading );
 	if ( ! $nag ) {
-		$failed = get_network_option( 'auto_core_update_failed' );
+		$failed = get_site_option( 'auto_core_update_failed' );
 		/*
 		 * If an update failed critically, we may have copied over version.php but not other files.
 		 * In that case, if the install claims we're running the version we attempted, nag.

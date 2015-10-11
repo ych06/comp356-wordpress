@@ -289,6 +289,22 @@ function get_post_permalink( $id = 0, $leavename = false, $sample = false ) {
 }
 
 /**
+ * Retrieve permalink from post ID.
+ *
+ * @since 1.0.0
+ *
+ * @param int|WP_Post $post_id    Optional. Post ID or WP_Post object. Default is global $post.
+ * @param mixed       $deprecated Not used.
+ * @return string|false
+ */
+function post_permalink( $post_id = 0, $deprecated = '' ) {
+	if ( !empty( $deprecated ) )
+		_deprecated_argument( __FUNCTION__, '1.3' );
+
+	return get_permalink($post_id);
+}
+
+/**
  * Retrieve the permalink for current page or page ID.
  *
  * Respects page_on_front. Use this one.
@@ -386,9 +402,6 @@ function get_attachment_link( $post = null, $leavename = false ) {
 
 	$post = get_post( $post );
 	$parent = ( $post->post_parent > 0 && $post->post_parent != $post->ID ) ? get_post( $post->post_parent ) : false;
-	if ( $parent && ! in_array( $parent->post_type, get_post_types() ) ) {
-		$parent = false;
-	}
 
 	if ( $wp_rewrite->using_permalinks() && $parent ) {
 		if ( 'page' == $parent->post_type )
@@ -406,8 +419,6 @@ function get_attachment_link( $post = null, $leavename = false ) {
 
 		if ( ! $leavename )
 			$link = str_replace( '%postname%', $name, $link );
-	} elseif ( $wp_rewrite->using_permalinks() && ! $leavename ) {
-		$link = home_url( user_trailingslashit( $post->post_name ) );
 	}
 
 	if ( ! $link )
@@ -627,35 +638,22 @@ function get_post_comments_feed_link($post_id = 0, $feed = '') {
 	if ( empty( $feed ) )
 		$feed = get_default_feed();
 
-	$post = get_post( $post_id );
-	$unattached = 'attachment' === $post->post_type && 0 === (int) $post->post_parent;
-
 	if ( '' != get_option('permalink_structure') ) {
 		if ( 'page' == get_option('show_on_front') && $post_id == get_option('page_on_front') )
 			$url = _get_page_link( $post_id );
 		else
 			$url = get_permalink($post_id);
 
-		if ( $unattached ) {
-			$url =  home_url( '/feed/' );
-			if ( $feed !== get_default_feed() ) {
-				$url .= "$feed/";
-			}
-			$url = add_query_arg( 'attachment_id', $post_id, $url );
-		} else {
-			$url = trailingslashit($url) . 'feed';
-			if ( $feed != get_default_feed() )
-				$url .= "/$feed";
-			$url = user_trailingslashit($url, 'single_feed');
-		}
+		$url = trailingslashit($url) . 'feed';
+		if ( $feed != get_default_feed() )
+			$url .= "/$feed";
+		$url = user_trailingslashit($url, 'single_feed');
 	} else {
-		if ( $unattached ) {
-			$url = add_query_arg( array( 'feed' => $feed, 'attachment_id' => $post_id ), home_url( '/' ) );
-		} elseif ( 'page' == $post->post_type ) {
+		$type = get_post_field('post_type', $post_id);
+		if ( 'page' == $type )
 			$url = add_query_arg( array( 'feed' => $feed, 'page_id' => $post_id ), home_url( '/' ) );
-		} else {
+		else
 			$url = add_query_arg( array( 'feed' => $feed, 'p' => $post_id ), home_url( '/' ) );
-		}
 	}
 
 	/**
@@ -682,12 +680,10 @@ function get_post_comments_feed_link($post_id = 0, $feed = '') {
  * @param string $feed      Optional. Feed format.
 */
 function post_comments_feed_link( $link_text = '', $post_id = '', $feed = '' ) {
-	$url = get_post_comments_feed_link( $post_id, $feed );
-	if ( empty( $link_text ) ) {
+	$url = esc_url( get_post_comments_feed_link( $post_id, $feed ) );
+	if ( empty($link_text) )
 		$link_text = __('Comments Feed');
-	}
 
-	$link = '<a href="' . esc_url( $url ) . '">' . $link_text . '</a>';
 	/**
 	 * Filter the post comment feed link anchor tag.
 	 *
@@ -697,7 +693,7 @@ function post_comments_feed_link( $link_text = '', $post_id = '', $feed = '' ) {
 	 * @param int    $post_id Post ID.
 	 * @param string $feed    The feed type, or an empty string for the default feed type.
 	 */
-	echo apply_filters( 'post_comments_feed_link_html', $link, $post_id, $feed );
+	echo apply_filters( 'post_comments_feed_link_html', "<a href='$url'>$link_text</a>", $post_id, $feed );
 }
 
 /**
@@ -1015,7 +1011,7 @@ function get_search_link( $query = '' ) {
 		$link = home_url('?s=' . urlencode($search) );
 	} else {
 		$search = urlencode($search);
-		$search = str_replace('%2F', '/', $search); // %2F(/) is not valid within a URL, send it un-encoded.
+		$search = str_replace('%2F', '/', $search); // %2F(/) is not valid within a URL, send it unencoded.
 		$link = str_replace( '%search%', $search, $permastruct );
 		$link = home_url( user_trailingslashit( $link, 'search' ) );
 	}
@@ -1179,46 +1175,6 @@ function get_post_type_archive_feed_link( $post_type, $feed = '' ) {
 }
 
 /**
- * Retrieve URL used for the post preview.
- *
- * Get the preview post URL. Allows additional query args to be appended.
- *
- * @since 4.4.0
- *
- * @param int|WP_Post $post         Optional. Post ID or `WP_Post` object. Defaults to global post.
- * @param array       $query_args   Optional. Array of additional query args to be appended to the link.
- * @param string      $preview_link Optional. Base preview link to be used if it should differ from the post permalink.
- * @return string URL used for the post preview.
- */
-function get_preview_post_link( $post = null, $query_args = array(), $preview_link = '' ) {
-	$post = get_post( $post );
-	if ( ! $post ) {
-		return;
-	}
-
-	$post_type_object = get_post_type_object( $post->post_type );
-	if ( is_post_type_viewable( $post_type_object ) ) {
-		if ( ! $preview_link ) {
-			$preview_link = get_permalink( $post );
-		}
-
-		$query_args['preview'] = 'true';
-		$preview_link = add_query_arg( $query_args, $preview_link );
-	}
-
-	/**
-	 * Filter the URL used for a post preview.
-	 *
-	 * @since 2.0.5
-	 * @since 4.0.0 Added the `$post` parameter.
-	 *
-	 * @param string  $preview_link URL used for the post preview.
-	 * @param WP_Post $post         Post object.
-	 */
-	return apply_filters( 'preview_post_link', $preview_link, $post );
-}
-
-/**
  * Retrieve edit posts link for post.
  *
  * Can be used within the WordPress loop or outside of it. Can be used with
@@ -1228,8 +1184,7 @@ function get_preview_post_link( $post = null, $query_args = array(), $preview_li
  *
  * @param int    $id      Optional. Post ID.
  * @param string $context Optional, defaults to display. How to write the '&', defaults to '&amp;'.
- * @return string|null The edit post link for the given post. null if the post type is invalid or does
- *                     not allow an editing UI.
+ * @return string|void The edit post link for the given post.
  */
 function get_edit_post_link( $id = 0, $context = 'display' ) {
 	if ( ! $post = get_post( $id ) )
@@ -1249,16 +1204,6 @@ function get_edit_post_link( $id = 0, $context = 'display' ) {
 	if ( !current_user_can( 'edit_post', $post->ID ) )
 		return;
 
-	$allowed = array_merge( array(
-		'revision',
-	), get_post_types( array(
-		'show_ui' => true,
-	) ) );
-
-	if ( ! in_array( $post->post_type, $allowed ) ) {
-		return;
-	}
-
 	/**
 	 * Filter the post edit link.
 	 *
@@ -1276,15 +1221,13 @@ function get_edit_post_link( $id = 0, $context = 'display' ) {
  * Display edit post link for post.
  *
  * @since 1.0.0
- * @since 4.4.0 The `$class` argument was added.
  *
  * @param string $text   Optional. Anchor text.
  * @param string $before Optional. Display before edit link.
  * @param string $after  Optional. Display after edit link.
  * @param int    $id     Optional. Post ID.
- * @param string $class  Optional. Add custom class to link.
  */
-function edit_post_link( $text = null, $before = '', $after = '', $id = 0, $class = 'post-edit-link' ) {
+function edit_post_link( $text = null, $before = '', $after = '', $id = 0 ) {
 	if ( ! $post = get_post( $id ) ) {
 		return;
 	}
@@ -1297,7 +1240,7 @@ function edit_post_link( $text = null, $before = '', $after = '', $id = 0, $clas
 		$text = __( 'Edit This' );
 	}
 
-	$link = '<a class="' . esc_attr( $class ) . '" href="' . esc_url( $url ) . '">' . $text . '</a>';
+	$link = '<a class="post-edit-link" href="' . $url . '">' . $text . '</a>';
 
 	/**
 	 * Filter the post edit link anchor tag.
@@ -1358,7 +1301,7 @@ function get_delete_post_link( $id = 0, $deprecated = '', $force_delete = false 
  *
  * @since 2.3.0
  *
- * @param int|WP_Comment $comment_id Optional. Comment ID or WP_Comment object.
+ * @param int $comment_id Optional. Comment ID.
  * @return string|void The edit comment link URL for the given comment.
  */
 function get_edit_comment_link( $comment_id = 0 ) {
@@ -1384,12 +1327,14 @@ function get_edit_comment_link( $comment_id = 0 ) {
  *
  * @since 1.0.0
  *
+ * @global object $comment
+ *
  * @param string $text   Optional. Anchor text.
  * @param string $before Optional. Display before edit link.
  * @param string $after  Optional. Display after edit link.
  */
 function edit_comment_link( $text = null, $before = '', $after = '' ) {
-	$comment = get_comment();
+	global $comment;
 
 	if ( ! current_user_can( 'edit_comment', $comment->comment_ID ) ) {
 		return;
@@ -1399,7 +1344,7 @@ function edit_comment_link( $text = null, $before = '', $after = '' ) {
 		$text = __( 'Edit This' );
 	}
 
-	$link = '<a class="comment-edit-link" href="' . esc_url( get_edit_comment_link( $comment ) ) . '">' . $text . '</a>';
+	$link = '<a class="comment-edit-link" href="' . get_edit_comment_link( $comment->comment_ID ) . '">' . $text . '</a>';
 
 	/**
 	 * Filter the comment edit link anchor tag.
@@ -1459,7 +1404,7 @@ function edit_bookmark_link( $link = '', $before = '', $after = '', $bookmark = 
 	if ( empty($link) )
 		$link = __('Edit This');
 
-	$link = '<a href="' . esc_url( get_edit_bookmark_link( $bookmark ) ) . '">' . $link . '</a>';
+	$link = '<a href="' . get_edit_bookmark_link( $bookmark ) . '">' . $link . '</a>';
 
 	/**
 	 * Filter the bookmark edit link anchor tag.
@@ -1565,6 +1510,9 @@ function get_adjacent_post( $in_same_term = false, $excluded_terms = '', $previo
 	$where = '';
 
 	if ( $in_same_term || ! empty( $excluded_terms ) ) {
+		$join = " INNER JOIN $wpdb->term_relationships AS tr ON p.ID = tr.object_id INNER JOIN $wpdb->term_taxonomy tt ON tr.term_taxonomy_id = tt.term_taxonomy_id";
+		$where = $wpdb->prepare( "AND tt.taxonomy = %s", $taxonomy );
+
 		if ( ! empty( $excluded_terms ) && ! is_array( $excluded_terms ) ) {
 			// back-compat, $excluded_terms used to be $excluded_terms with IDs separated by " and "
 			if ( false !== strpos( $excluded_terms, ' and ' ) ) {
@@ -1578,9 +1526,6 @@ function get_adjacent_post( $in_same_term = false, $excluded_terms = '', $previo
 		}
 
 		if ( $in_same_term ) {
-			$join .= " INNER JOIN $wpdb->term_relationships AS tr ON p.ID = tr.object_id INNER JOIN $wpdb->term_taxonomy tt ON tr.term_taxonomy_id = tt.term_taxonomy_id";
-			$where .= $wpdb->prepare( "AND tt.taxonomy = %s", $taxonomy );
-
 			if ( ! is_object_in_taxonomy( $post->post_type, $taxonomy ) )
 				return '';
 			$term_array = wp_get_object_terms( $post->ID, $taxonomy, array( 'fields' => 'ids' ) );
@@ -1635,33 +1580,18 @@ function get_adjacent_post( $in_same_term = false, $excluded_terms = '', $previo
 	$order = $previous ? 'DESC' : 'ASC';
 
 	/**
-	 * Filter the excluded term ids
-	 *
-	 * The dynamic portion of the hook name, `$adjacent`, refers to the type
-	 * of adjacency, 'next' or 'previous'.
-	 *
-	 * @since 4.4.0
-	 *
-	 * @param string $excluded_terms Array of excluded term IDs.
-	 */
-	$excluded_terms = apply_filters( "get_{$adjacent}_post_excluded_terms", $excluded_terms );
-
-	/**
 	 * Filter the JOIN clause in the SQL for an adjacent post query.
 	 *
 	 * The dynamic portion of the hook name, `$adjacent`, refers to the type
 	 * of adjacency, 'next' or 'previous'.
 	 *
 	 * @since 2.5.0
-	 * @since 4.4.0 Added the `$taxonomy` and `$post` parameters.
 	 *
-	 * @param string  $join           The JOIN clause in the SQL.
-	 * @param bool    $in_same_term   Whether post should be in a same taxonomy term.
-	 * @param array   $excluded_terms Array of excluded term IDs.
-	 * @param string  $taxonomy       Taxonomy. Used to identify the term used when `$in_same_term` is true.
-	 * @param WP_Post $post           WP_Post object.
+	 * @param string $join           The JOIN clause in the SQL.
+	 * @param bool   $in_same_term   Whether post should be in a same taxonomy term.
+	 * @param array  $excluded_terms Array of excluded term IDs.
 	 */
-	$join = apply_filters( "get_{$adjacent}_post_join", $join, $in_same_term, $excluded_terms, $taxonomy, $post );
+	$join  = apply_filters( "get_{$adjacent}_post_join", $join, $in_same_term, $excluded_terms );
 
 	/**
 	 * Filter the WHERE clause in the SQL for an adjacent post query.
@@ -1670,15 +1600,12 @@ function get_adjacent_post( $in_same_term = false, $excluded_terms = '', $previo
 	 * of adjacency, 'next' or 'previous'.
 	 *
 	 * @since 2.5.0
-	 * @since 4.4.0 Added the `$taxonomy` and `$post` parameters.
 	 *
 	 * @param string $where          The `WHERE` clause in the SQL.
 	 * @param bool   $in_same_term   Whether post should be in a same taxonomy term.
 	 * @param array  $excluded_terms Array of excluded term IDs.
-	 * @param string $taxonomy       Taxonomy. Used to identify the term used when `$in_same_term` is true.
-	 * @param WP_Post $post           WP_Post object.
 	 */
-	$where = apply_filters( "get_{$adjacent}_post_where", $wpdb->prepare( "WHERE p.post_date $op %s AND p.post_type = %s $where", $current_post_date, $post->post_type ), $in_same_term, $excluded_terms, $taxonomy, $post );
+	$where = apply_filters( "get_{$adjacent}_post_where", $wpdb->prepare( "WHERE p.post_date $op %s AND p.post_type = %s $where", $current_post_date, $post->post_type ), $in_same_term, $excluded_terms );
 
 	/**
 	 * Filter the ORDER BY clause in the SQL for an adjacent post query.
@@ -1687,12 +1614,10 @@ function get_adjacent_post( $in_same_term = false, $excluded_terms = '', $previo
 	 * of adjacency, 'next' or 'previous'.
 	 *
 	 * @since 2.5.0
-	 * @since 4.4.0 Added the `$post` parameter.
 	 *
 	 * @param string $order_by The `ORDER BY` clause in the SQL.
-	 * @param WP_Post $post    WP_Post object.
 	 */
-	$sort  = apply_filters( "get_{$adjacent}_post_sort", "ORDER BY p.post_date $order LIMIT 1", $post );
+	$sort  = apply_filters( "get_{$adjacent}_post_sort", "ORDER BY p.post_date $order LIMIT 1" );
 
 	$query = "SELECT p.ID FROM $wpdb->posts AS p $join $where $sort";
 	$query_key = 'adjacent_post_' . md5( $query );
@@ -2036,7 +1961,7 @@ function adjacent_post_link( $format, $link, $in_same_term = false, $excluded_te
  *
  * @param int  $pagenum Optional. Page ID.
  * @param bool $escape  Optional. Whether to escape the URL for display, with esc_url(). Defaults to true.
- * 	                    Otherwise, prepares the URL with esc_url_raw().
+* 	                    Otherwise, prepares the URL with esc_url_raw().
  * @return string The link URL for the given page number.
  */
 function get_pagenum_link($pagenum = 1, $escape = true ) {
@@ -2337,17 +2262,13 @@ function posts_nav_link( $sep = '', $prelabel = '', $nxtlabel = '' ) {
  * Return navigation to next/previous post when applicable.
  *
  * @since 4.1.0
- * @since 4.4.0 Introduced the `in_same_term`, `excluded_terms`, and `taxonomy` arguments.
  *
  * @param array $args {
  *     Optional. Default post navigation arguments. Default empty array.
  *
- *     @type string       $prev_text          Anchor text to display in the previous post link. Default '%title'.
- *     @type string       $next_text          Anchor text to display in the next post link. Default '%title'.
- *     @type bool         $in_same_term       Whether link should be in a same taxonomy term. Default false.
- *     @type array|string $excluded_terms     Array or comma-separated list of excluded term IDs. Default empty.
- *     @type string       $taxonomy           Taxonomy, if `$in_same_term` is true. Default 'category'.
- *     @type string       $screen_reader_text Screen reader text for nav element. Default 'Post navigation'.
+ *     @type string $prev_text          Anchor text to display in the previous post link. Default `%title`.
+ *     @type string $next_text          Anchor text to display in the next post link. Default `%title`.
+ *     @type string $screen_reader_text Screen reader text for nav element. Default 'Post navigation'.
  * }
  * @return string Markup for post links.
  */
@@ -2355,29 +2276,12 @@ function get_the_post_navigation( $args = array() ) {
 	$args = wp_parse_args( $args, array(
 		'prev_text'          => '%title',
 		'next_text'          => '%title',
-		'in_same_term'       => false,
-		'excluded_terms'     => '',
-		'taxonomy'           => 'category',
 		'screen_reader_text' => __( 'Post navigation' ),
 	) );
 
 	$navigation = '';
-
-	$previous = get_previous_post_link(
-		'<div class="nav-previous">%link</div>',
-		$args['prev_text'],
-		$args['in_same_term'],
-		$args['excluded_terms'],
-		$args['taxonomy']
-	);
-
-	$next = get_next_post_link(
-		'<div class="nav-next">%link</div>',
-		$args['next_text'],
-		$args['in_same_term'],
-		$args['excluded_terms'],
-		$args['taxonomy']
-	);
+	$previous   = get_previous_post_link( '<div class="nav-previous">%link</div>', $args['prev_text'] );
+	$next       = get_next_post_link( '<div class="nav-next">%link</div>', $args['next_text'] );
 
 	// Only add markup if there's somewhere to navigate to.
 	if ( $previous || $next ) {
@@ -2535,26 +2439,6 @@ function _navigation_markup( $links, $class = 'posts-navigation', $screen_reader
 		<div class="nav-links">%3$s</div>
 	</nav>';
 
-	/**
-	 * Filter the navigation markup template.
-	 *
-	 * Note: The filtered template HTML must contain specifiers for the navigation
-	 * class (%1$s), the screen-reader-text value (%2$s), and placement of the
-	 * navigation links (%3$s):
-	 *
-	 *     <nav class="navigation %1$s" role="navigation">
-	 *         <h2 class="screen-reader-text">%2$s</h2>
-	 *         <div class="nav-links">%3$s</div>
-	 *     </nav>
-	 *
-	 * @since 4.4.0
-	 *
-	 * @param string $template The default template.
-	 * @param string $class    The class passed by the calling function.
-	 * @return string Navigation template.
-	 */
-	$template = apply_filters( 'navigation_markup_template', $template, $class );
-
 	return sprintf( $template, sanitize_html_class( $class ), esc_html( $screen_reader_text ), $links );
 }
 
@@ -2616,7 +2500,7 @@ function get_comments_pagenum_link( $pagenum = 1, $max_page = 0 ) {
 function get_next_comments_link( $label = '', $max_page = 0 ) {
 	global $wp_query;
 
-	if ( ! is_singular() )
+	if ( !is_singular() || !get_option('page_comments') )
 		return;
 
 	$page = get_query_var('cpage');
@@ -2670,7 +2554,7 @@ function next_comments_link( $label = '', $max_page = 0 ) {
  * @return string|void HTML-formatted link for the previous page of comments.
  */
 function get_previous_comments_link( $label = '' ) {
-	if ( ! is_singular() )
+	if ( !is_singular() || !get_option('page_comments') )
 		return;
 
 	$page = get_query_var('cpage');
@@ -2718,7 +2602,7 @@ function previous_comments_link( $label = '' ) {
 function paginate_comments_links($args = array()) {
 	global $wp_rewrite;
 
-	if ( ! is_singular() )
+	if ( !is_singular() || !get_option('page_comments') )
 		return;
 
 	$page = get_query_var('cpage');
@@ -2743,105 +2627,6 @@ function paginate_comments_links($args = array()) {
 		echo $page_links;
 	else
 		return $page_links;
-}
-
-/**
- * Returns navigation to next/previous set of comments when applicable.
- *
- * @since 4.4.0
- *
- * @param array $args {
- *     Optional. Default comments navigation arguments.
- *
- *     @type string $prev_text          Anchor text to display in the previous comments link. Default 'Older comments'.
- *     @type string $next_text          Anchor text to display in the next comments link. Default 'Newer comments'.
- *     @type string $screen_reader_text Screen reader text for nav element. Default 'Comments navigation'.
- * }
- * @return string Markup for comments links.
- */
-function get_the_comments_navigation( $args = array() ) {
-	$navigation = '';
-
-	// Are there comments to navigate through?
-	if ( get_comment_pages_count() > 1 ) {
-		$args = wp_parse_args( $args, array(
-			'prev_text'          => __( 'Older comments' ),
-			'next_text'          => __( 'Newer comments' ),
-			'screen_reader_text' => __( 'Comments navigation' ),
-		) );
-
-		$prev_link = get_previous_comments_link( $args['prev_text'] );
-		$next_link = get_next_comments_link( $args['next_text'] );
-
-		if ( $prev_link ) {
-			$navigation .= '<div class="nav-previous">' . $prev_link . '</div>';
-		}
-
-		if ( $next_link ) {
-			$navigation .= '<div class="nav-next">' . $next_link . '</div>';
-		}
-
-		$navigation = _navigation_markup( $navigation, 'comment-navigation', $args['screen_reader_text'] );
-	}
-
-	return $navigation;
-}
-
-/**
- * Displays navigation to next/previous set of comments when applicable.
- *
- * @since 4.4.0
- *
- * @param array $args See {@see get_the_comments_navigation()} for available arguments.
- */
-function the_comments_navigation( $args = array() ) {
-	echo get_the_comments_navigation( $args );
-}
-
-/**
- * Returns a paginated navigation to next/previous set of comments,
- * when applicable.
- *
- * @since 4.4.0
- *
- * @see paginate_comments_links()
- *
- * @param array $args {
- *     Optional. Default pagination arguments.
- *
- *     @type string $screen_reader_text Screen reader text for nav element. Default 'Comments navigation'.
- * }
- * @return string Markup for pagination links.
- */
-function get_the_comments_pagination( $args = array() ) {
-	$navigation = '';
-	$args       = wp_parse_args( $args, array(
-		'screen_reader_text' => __( 'Comments navigation' ),
-	) );
-	$args['echo'] = false;
-
-	// Make sure we get plain links, so we get a string we can work with.
-	$args['type'] = 'plain';
-
-	$links = paginate_comments_links( $args );
-
-	if ( $links ) {
-		$navigation = _navigation_markup( $links, 'comments-pagination', $args['screen_reader_text'] );
-	}
-
-	return $navigation;
-}
-
-/**
- * Displays a paginated navigation to next/previous set of comments,
- * when applicable.
- *
- * @since 4.4.0
- *
- * @param array $args See {@see get_the_comments_pagination()} for available arguments.
- */
-function the_comments_pagination( $args = array() ) {
-	echo get_the_comments_pagination( $args );
 }
 
 /**
@@ -2943,8 +2728,6 @@ function home_url( $path = '', $scheme = null ) {
  * @return string Home URL link with optional path appended.
 */
 function get_home_url( $blog_id = null, $path = '', $scheme = null ) {
-	global $pagenow;
-
 	$orig_scheme = $scheme;
 
 	if ( empty( $blog_id ) || !is_multisite() ) {
@@ -2956,7 +2739,7 @@ function get_home_url( $blog_id = null, $path = '', $scheme = null ) {
 	}
 
 	if ( ! in_array( $scheme, array( 'http', 'https', 'relative' ) ) ) {
-		if ( is_ssl() && ! is_admin() && 'wp-login.php' !== $pagenow )
+		if ( is_ssl() && ! is_admin() && 'wp-login.php' !== $GLOBALS['pagenow'] )
 			$scheme = 'https';
 		else
 			$scheme = parse_url( $url, PHP_URL_SCHEME );
@@ -3481,28 +3264,23 @@ function get_edit_profile_url( $user_id = 0, $scheme = 'admin' ) {
  * Output rel=canonical for singular queries.
  *
  * @since 2.9.0
+ *
+ * @global WP_Query $wp_the_query
 */
 function rel_canonical() {
-	if ( ! is_singular() ) {
+	if ( !is_singular() )
 		return;
-	}
 
-	if ( ! $id = get_queried_object_id() ) {
+	global $wp_the_query;
+	if ( !$id = $wp_the_query->get_queried_object_id() )
 		return;
-	}
 
-	$url = get_permalink( $id );
+	$link = get_permalink( $id );
 
-	$page = get_query_var( 'page' );
-	if ( $page ) {
-		$url = trailingslashit( $url ) . user_trailingslashit( $page, 'single_paged' );
-	}
+	if ( $page = get_query_var('cpage') )
+		$link = get_comments_pagenum_link( $page );
 
-	$cpage = get_query_var( 'cpage' );
-	if ( $cpage ) {
-		$url = get_comments_pagenum_link( $cpage );
-	}
-	echo '<link rel="canonical" href="' . esc_url( $url ) . "\" />\n";
+	echo "<link rel='canonical' href='$link' />\n";
 }
 
 /**
@@ -3514,6 +3292,8 @@ function rel_canonical() {
  * via the get_shortlink filter.
  *
  * @since 3.0.0.
+ *
+ * @global WP_Query $wp_query
  *
  * @param int    $id          A post or blog id. Default is 0, which means the current post or blog.
  * @param string $context     Whether the id is a 'blog' id, 'post' id, or 'media' id.
@@ -3539,13 +3319,13 @@ function wp_get_shortlink($id = 0, $context = 'post', $allow_slugs = true) {
 	 */
 	$shortlink = apply_filters( 'pre_get_shortlink', false, $id, $context, $allow_slugs );
 
-	if ( false !== $shortlink ) {
+	if ( false !== $shortlink )
 		return $shortlink;
-	}
 
+	global $wp_query;
 	$post_id = 0;
 	if ( 'query' == $context && is_singular() ) {
-		$post_id = get_queried_object_id();
+		$post_id = $wp_query->get_queried_object_id();
 		$post = get_post( $post_id );
 	} elseif ( 'post' == $context ) {
 		$post = get_post( $id );
@@ -3664,7 +3444,7 @@ function the_shortlink( $text = '', $title = '', $before = '', $after = '' ) {
  * @since 4.2.0
  *
  * @param mixed $id_or_email The Gravatar to retrieve a URL for. Accepts a user_id, gravatar md5 hash,
- *                           user email, WP_User object, WP_Post object, or WP_Comment object.
+ *                           user email, WP_User object, WP_Post object, or comment object.
  * @param array $args {
  *     Optional. Arguments to return instead of the default arguments.
  *
@@ -3695,8 +3475,8 @@ function get_avatar_url( $id_or_email, $args = null ) {
  *
  * @since 4.2.0
  *
- * @param mixed $id_or_email The Gravatar to retrieve. Accepts a user_id, gravatar md5 hash,
- *                            user email, WP_User object, WP_Post object, or WP_Comment object.
+ * @param mixed $id_or_email The Gravatar to check the data against. Accepts a user_id, gravatar md5 hash,
+ *                           user email, WP_User object, WP_Post object, or comment object.
  * @param array $args {
  *     Optional. Arguments to return instead of the default arguments.
  *
@@ -3796,9 +3576,8 @@ function get_avatar_data( $id_or_email, $args = null ) {
 	 *
 	 * @since 4.2.0
 	 *
-	 * @param array  $args        Arguments passed to get_avatar_data(), after processing.
-	 * @param mixed  $id_or_email The Gravatar to retrieve. Accepts a user_id, gravatar md5 hash,
-	 *                            user email, WP_User object, WP_Post object, or WP_Comment object.
+	 * @param array             $args          Arguments passed to get_avatar_data(), after processing.
+	 * @param int|object|string $id_or_email   A user ID, email address, or comment object.
 	 */
 	$args = apply_filters( 'pre_get_avatar_data', $args, $id_or_email );
 
@@ -3809,10 +3588,6 @@ function get_avatar_data( $id_or_email, $args = null ) {
 
 	$email_hash = '';
 	$user = $email = false;
-
-	if ( is_object( $id_or_email ) && isset( $id_or_email->comment_ID ) ) {
-		$id_or_email = get_comment( $id_or_email );
-	}
 
 	// Process the user identifier.
 	if ( is_numeric( $id_or_email ) ) {
@@ -3831,7 +3606,9 @@ function get_avatar_data( $id_or_email, $args = null ) {
 	} elseif ( $id_or_email instanceof WP_Post ) {
 		// Post Object
 		$user = get_user_by( 'id', (int) $id_or_email->post_author );
-	} elseif ( $id_or_email instanceof WP_Comment ) {
+	} elseif ( is_object( $id_or_email ) && isset( $id_or_email->comment_ID ) ) {
+		// Comment Object
+
 		/**
 		 * Filter the list of allowed comment types for retrieving avatars.
 		 *
@@ -3894,10 +3671,9 @@ function get_avatar_data( $id_or_email, $args = null ) {
 	 *
 	 * @since 4.2.0
 	 *
-	 * @param string $url         The URL of the avatar.
-	 * @param mixed  $id_or_email The Gravatar to retrieve. Accepts a user_id, gravatar md5 hash,
-	 *                            user email, WP_User object, WP_Post object, or WP_Comment object.
-	 * @param array  $args        Arguments passed to get_avatar_data(), after processing.
+	 * @param string            $url         The URL of the avatar.
+	 * @param int|object|string $id_or_email A user ID, email address, or comment object.
+	 * @param array             $args        Arguments passed to get_avatar_data(), after processing.
 	 */
 	$args['url'] = apply_filters( 'get_avatar_url', $url, $id_or_email, $args );
 
@@ -3906,9 +3682,8 @@ function get_avatar_data( $id_or_email, $args = null ) {
 	 *
 	 * @since 4.2.0
 	 *
-	 * @param array  $args        Arguments passed to get_avatar_data(), after processing.
-	 * @param mixed  $id_or_email The Gravatar to retrieve. Accepts a user_id, gravatar md5 hash,
-	 *                            user email, WP_User object, WP_Post object, or WP_Comment object.
+	 * @param array             $args        Arguments passed to get_avatar_data(), after processing.
+	 * @param int|object|string $id_or_email A user ID, email address, or comment object.
 	 */
 	return apply_filters( 'get_avatar_data', $args, $id_or_email );
 }

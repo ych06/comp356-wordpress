@@ -89,8 +89,7 @@ function get_plugin_data( $plugin_file, $markup = true, $translate = true ) {
 
 	// Site Wide Only is the old header for Network
 	if ( ! $plugin_data['Network'] && $plugin_data['_sitewide'] ) {
-		/* translators: 1: Site Wide Only: true, 2: Network: true */
-		_deprecated_argument( __FUNCTION__, '3.0', sprintf( __( 'The %1$s plugin header is deprecated. Use %2$s instead.' ), '<code>Site Wide Only: true</code>', '<code>Network: true</code>' ) );
+		_deprecated_argument( __FUNCTION__, '3.0', sprintf( __( 'The <code>%1$s</code> plugin header is deprecated. Use <code>%2$s</code> instead.' ), 'Site Wide Only: true', 'Network: true' ) );
 		$plugin_data['Network'] = $plugin_data['_sitewide'];
 	}
 	$plugin_data['Network'] = ( 'true' == strtolower( $plugin_data['Network'] ) );
@@ -466,7 +465,7 @@ function is_plugin_active_for_network( $plugin ) {
 	if ( !is_multisite() )
 		return false;
 
-	$plugins = get_network_option( 'active_sitewide_plugins' );
+	$plugins = get_site_option( 'active_sitewide_plugins');
 	if ( isset($plugins[$plugin]) )
 		return true;
 
@@ -524,7 +523,7 @@ function activate_plugin( $plugin, $redirect = '', $network_wide = false, $silen
 
 	if ( is_multisite() && ( $network_wide || is_network_only_plugin($plugin) ) ) {
 		$network_wide = true;
-		$current = get_network_option( 'active_sitewide_plugins', array() );
+		$current = get_site_option( 'active_sitewide_plugins', array() );
 		$_GET['networkwide'] = 1; // Back compat for plugins looking for this value.
 	} else {
 		$current = get_option( 'active_plugins', array() );
@@ -577,9 +576,9 @@ function activate_plugin( $plugin, $redirect = '', $network_wide = false, $silen
 		}
 
 		if ( $network_wide ) {
-			$current = get_network_option( 'active_sitewide_plugins', array() );
+			$current = get_site_option( 'active_sitewide_plugins', array() );
 			$current[$plugin] = time();
-			update_network_option( 'active_sitewide_plugins', $current );
+			update_site_option( 'active_sitewide_plugins', $current );
 		} else {
 			$current = get_option( 'active_plugins', array() );
 			$current[] = $plugin;
@@ -628,7 +627,7 @@ function activate_plugin( $plugin, $redirect = '', $network_wide = false, $silen
  */
 function deactivate_plugins( $plugins, $silent = false, $network_wide = null ) {
 	if ( is_multisite() )
-		$network_current = get_network_option( 'active_sitewide_plugins', array() );
+		$network_current = get_site_option( 'active_sitewide_plugins', array() );
 	$current = get_option( 'active_plugins', array() );
 	$do_blog = $do_network = false;
 
@@ -709,7 +708,7 @@ function deactivate_plugins( $plugins, $silent = false, $network_wide = null ) {
 	if ( $do_blog )
 		update_option('active_plugins', $current);
 	if ( $do_network )
-		update_network_option( 'active_sitewide_plugins', $network_current );
+		update_site_option( 'active_sitewide_plugins', $network_current );
 }
 
 /**
@@ -766,7 +765,7 @@ function delete_plugins( $plugins, $deprecated = '' ) {
 		return false;
 
 	$checked = array();
-	foreach ( $plugins as $plugin )
+	foreach( $plugins as $plugin )
 		$checked[] = 'checked[]=' . $plugin;
 
 	ob_start();
@@ -814,7 +813,7 @@ function delete_plugins( $plugins, $deprecated = '' ) {
 
 	$errors = array();
 
-	foreach ( $plugins as $plugin_file ) {
+	foreach( $plugins as $plugin_file ) {
 		// Run Uninstall hook.
 		if ( is_uninstallable_plugin( $plugin_file ) ) {
 			uninstall_plugin($plugin_file);
@@ -881,7 +880,7 @@ function validate_active_plugins() {
 	}
 
 	if ( is_multisite() && current_user_can( 'manage_network_plugins' ) ) {
-		$network_plugins = (array) get_network_option( 'active_sitewide_plugins', array() );
+		$network_plugins = (array) get_site_option( 'active_sitewide_plugins', array() );
 		$plugins = array_merge( $plugins, array_keys( $network_plugins ) );
 	}
 
@@ -1014,7 +1013,7 @@ function uninstall_plugin($plugin) {
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  * @param string $icon_url The url to the icon to be used for this menu.
  *     * Pass a base64-encoded SVG using a data URI, which will be colored to match the color scheme.
  *       This should begin with 'data:image/svg+xml;base64,'.
@@ -1074,7 +1073,7 @@ function add_menu_page( $page_title, $menu_title, $capability, $menu_slug, $func
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  * @param string $icon_url The url to the icon to be used for this menu
  *
  * @return string The resulting page's hook_suffix
@@ -1102,7 +1101,7 @@ function add_object_page( $page_title, $menu_title, $capability, $menu_slug, $fu
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  * @param string $icon_url The url to the icon to be used for this menu
  *
  * @return string The resulting page's hook_suffix
@@ -1136,7 +1135,7 @@ function add_utility_page( $page_title, $menu_title, $capability, $menu_slug, $f
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1202,7 +1201,7 @@ function add_submenu_page( $parent_slug, $page_title, $menu_title, $capability, 
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1223,7 +1222,7 @@ function add_management_page( $page_title, $menu_title, $capability, $menu_slug,
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1244,7 +1243,7 @@ function add_options_page( $page_title, $menu_title, $capability, $menu_slug, $f
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1265,7 +1264,7 @@ function add_theme_page( $page_title, $menu_title, $capability, $menu_slug, $fun
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1286,7 +1285,7 @@ function add_plugins_page( $page_title, $menu_title, $capability, $menu_slug, $f
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1310,7 +1309,7 @@ function add_users_page( $page_title, $menu_title, $capability, $menu_slug, $fun
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1331,7 +1330,7 @@ function add_dashboard_page( $page_title, $menu_title, $capability, $menu_slug, 
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1352,7 +1351,7 @@ function add_posts_page( $page_title, $menu_title, $capability, $menu_slug, $fun
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1373,7 +1372,7 @@ function add_media_page( $page_title, $menu_title, $capability, $menu_slug, $fun
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
  */
@@ -1394,7 +1393,7 @@ function add_links_page( $page_title, $menu_title, $capability, $menu_slug, $fun
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
 */
@@ -1415,7 +1414,7 @@ function add_pages_page( $page_title, $menu_title, $capability, $menu_slug, $fun
  * @param string $menu_title The text to be used for the menu
  * @param string $capability The capability required for this menu to be displayed to the user.
  * @param string $menu_slug The slug name to refer to this menu by (should be unique for this menu)
- * @param callable $function The function to be called to output the content for this page.
+ * @param callback $function The function to be called to output the content for this page.
  *
  * @return false|string The resulting page's hook_suffix, or false if the user does not have the capability required.
 */
@@ -1948,12 +1947,4 @@ function wp_clean_plugins_cache( $clear_update_cache = true ) {
 	if ( $clear_update_cache )
 		delete_site_transient( 'update_plugins' );
 	wp_cache_delete( 'plugins', 'plugins' );
-}
-
-/**
- * @param string $plugin
- */
-function plugin_sandbox_scrape( $plugin ) {
-	wp_register_plugin_realpath( WP_PLUGIN_DIR . '/' . $plugin );
-	include( WP_PLUGIN_DIR . '/' . $plugin );
 }
